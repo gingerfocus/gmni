@@ -1,12 +1,15 @@
 #include <assert.h>
 #include <errno.h>
 #include <getopt.h>
+#include <netdb.h>
 #include <openssl/bio.h>
 #include <openssl/err.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/socket.h>
+#include <sys/types.h>
 #include <unistd.h>
 #include "client.h"
 
@@ -35,15 +38,19 @@ main(int argc, char *argv[])
 	enum input_mode input_mode = INPUT_READ;
 	FILE *input_source = stdin;
 	bool follow_redirects = false, linefeed = true;
+	struct addrinfo hints = {0};
+	struct gemini_options opts = {
+		.hints = &hints,
+	};
 
 	int c;
 	while ((c = getopt(argc, argv, "46C:d:D:hlLiIN")) != -1) {
 		switch (c) {
 		case '4':
-			assert(0); // TODO
+			hints.ai_family = AF_INET;
 			break;
 		case '6':
-			assert(0); // TODO
+			hints.ai_family = AF_INET6;
 			break;
 		case 'C':
 			assert(0); // TODO: Client certificates
@@ -104,7 +111,7 @@ main(int argc, char *argv[])
 	int ret = 0;
 	while (!exit) {
 		struct gemini_response resp;
-		enum gemini_result r = gemini_request(url, NULL, &resp);
+		enum gemini_result r = gemini_request(url, &opts, &resp);
 		if (r != GEMINI_OK) {
 			fprintf(stderr, "Error: %s\n", gemini_strerr(r, &resp));
 			ret = (int)r;

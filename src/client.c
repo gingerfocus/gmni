@@ -23,7 +23,7 @@ gemini_get_addrinfo(struct Curl_URL *uri, struct gemini_options *options,
 		free(uport);
 	}
 
-	if (options && options->addr->ai_family != AF_UNSPEC) {
+	if (options && options->addr && options->addr->ai_family != AF_UNSPEC) {
 		*addr = options->addr;
 	} else {
 		struct addrinfo hints = {0};
