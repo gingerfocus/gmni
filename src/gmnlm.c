@@ -63,9 +63,11 @@ display_gemini(FILE *tty, struct gemini_response *resp,
 			col += fprintf(tty, "   %s\n", trim_ws(tok.text));
 			break;
 		case GEMINI_LINK:
-			(void)next; // TODO: Record links
 			col += fprintf(tty, "[%d] %s\n", nlinks++, trim_ws(
 				tok.link.text ? tok.link.text : tok.link.url));
+			*next = calloc(1, sizeof(struct link));
+			(*next)->url = strdup(trim_ws(tok.link.url));
+			next = &(*next)->next;
 			break;
 		case GEMINI_PREFORMATTED:
 			continue; // TODO
@@ -117,7 +119,6 @@ main(int argc, char *argv[])
 {
 	bool pagination = true;
 
-	bool have_url = false;
 	struct Curl_URL *url = curl_url();
 
 	FILE *tty = fopen("/dev/tty", "w+");
@@ -139,8 +140,7 @@ main(int argc, char *argv[])
 
 	if (optind == argc - 1) {
 		set_url(url, argv[optind]);
-		have_url = true;
-	} else if (optind < argc - 1) {
+	} else {
 		usage(argv[0]);
 		return 1;
 	}
@@ -154,8 +154,6 @@ main(int argc, char *argv[])
 	bool run = true;
 	struct gemini_response resp;
 	while (run) {
-		assert(have_url); // TODO
-
 		struct link *links;
 		static char prompt[4096];
 
@@ -164,7 +162,8 @@ main(int argc, char *argv[])
 		assert(uc == CURLUE_OK); // Invariant
 
 		snprintf(prompt, sizeof(prompt), "\n\t%s\n"
-			"\tWhere to? [n]: follow Nth link; [o <url>]: open URL; [q]: quit\n"
+			"\tWhere to? [n]: follow Nth link; [o <url>]: open URL; [q]: quit "
+			  "[b]ack; [f]orward\n"
 			"=> ", plain_url);
 
 		enum gemini_result res = gemini_request(plain_url, &opts, &resp);
@@ -194,19 +193,49 @@ main(int argc, char *argv[])
 
 		gemini_response_finish(&resp);
 
-		fprintf(tty, "%s", prompt);
-		size_t l = 0;
-		char *in = NULL;
-		ssize_t n = getline(&in, &l, tty);
-		if (n == -1 && feof(tty)) {
-			break;
-		}
+		bool prompting = true;
+		while (prompting) {
+			fprintf(tty, "%s", prompt);
 
-		if (strcmp(in, "q\n") == 0) {
-			run = false;
-		}
+			size_t l = 0;
+			char *in = NULL;
+			ssize_t n = getline(&in, &l, tty);
+			if (n == -1 && feof(tty)) {
+				prompting = run = false;
+				break;
+			}
+			if (strcmp(in, "q\n") == 0) {
+				prompting = run = false;
+				break;
+			}
 
-		free(in);
+			struct link *link = links;
+			char *endptr;
+			int linksel = (int)strtol(in, &endptr, 10);
+			if (endptr[0] == '\n' && linksel >= 0) {
+				while (linksel > 0 && link) {
+					link = link->next;
+					--linksel;
+				}
+
+				if (!link) {
+					fprintf(stderr, "Error: no such link.\n");
+				} else {
+					prompting = false;
+					set_url(url, link->url);
+				}
+			}
+
+			link = links;
+			while (link) {
+				struct link *next = link->next;
+				free(link->url);
+				free(link);
+				link = next;
+			}
+
+			free(in);
+		}
 	}
 
 	SSL_CTX_free(opts.ssl_ctx);
