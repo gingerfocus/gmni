@@ -2,6 +2,7 @@
 #include <errno.h>
 #include <netdb.h>
 #include <openssl/bio.h>
+#include <openssl/err.h>
 #include <openssl/ssl.h>
 #include <stdlib.h>
 #include <string.h>
@@ -168,6 +169,21 @@ gemini_request(const char *url, struct gemini_options *options,
 		goto cleanup;
 	}
 
+	if (r < 3 || strcmp(&buf[r - 2], "\r\n") != 0) {
+		res = GEMINI_ERR_PROTOCOL;
+		goto cleanup;
+	}
+
+	char *endptr;
+	resp->status = (int)strtol(buf, &endptr, 10);
+	if (*endptr != ' ' || resp->status <= 10 || resp->status >= 70) {
+		res = GEMINI_ERR_PROTOCOL;
+		goto cleanup;
+	}
+	resp->meta = calloc(r - 5 /* 2 digits, space, and CRLF */ + 1 /* NUL */, 1);
+	strncpy(resp->meta, &endptr[1], r - 5);
+	resp->meta[r - 5] = '\0';
+
 cleanup:
 	curl_url_cleanup(uri);
 	return res;
@@ -187,4 +203,30 @@ gemini_response_finish(struct gemini_response *resp)
 	SSL_free(resp->ssl);
 	SSL_CTX_free(resp->ssl_ctx);
 	free(resp->meta);
+}
+
+const char *
+gemini_strerr(enum gemini_result r, struct gemini_response *resp)
+{
+	switch (r) {
+	case GEMINI_OK:
+		return "OK";
+	case GEMINI_ERR_OOM:
+		return "Out of memory";
+	case GEMINI_ERR_INVALID_URL:
+		return "Invalid URL";
+	case GEMINI_ERR_RESOLVE:
+		return gai_strerror(resp->status);
+	case GEMINI_ERR_CONNECT:
+		return strerror(errno);
+	case GEMINI_ERR_SSL:
+		return ERR_error_string(
+			SSL_get_error(resp->ssl, resp->status),
+			NULL);
+	case GEMINI_ERR_IO:
+		return "I/O error";
+	case GEMINI_ERR_PROTOCOL:
+		return "Protocol error";
+	}
+	assert(0);
 }

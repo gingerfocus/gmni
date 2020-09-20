@@ -46,6 +46,7 @@ enum gemini_result {
 	// use SSL_get_error(resp->ssl, resp->status) to get details
 	GEMINI_ERR_SSL,
 	GEMINI_ERR_IO,
+	GEMINI_ERR_PROTOCOL,
 };
 
 // Requests the specified URL via the gemini protocol. If options is non-NULL,
@@ -63,5 +64,8 @@ enum gemini_result gemini_request(const char *url,
 // gemini_options, set the ctx pointer to NULL before calling
 // gemini_response_finish.
 void gemini_response_finish(struct gemini_response *resp);
+
+// Returns a user-friendly string describing an error.
+const char *gemini_strerr(enum gemini_result r, struct gemini_response *resp);
 
 #endif
