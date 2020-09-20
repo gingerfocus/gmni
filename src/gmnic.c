@@ -34,7 +34,7 @@ main(int argc, char *argv[])
 	};
 	enum input_mode input_mode = INPUT_READ;
 	FILE *input_source = stdin;
-	bool linefeed = true;
+	bool follow_redirects = false, linefeed = true;
 
 	int c;
 	while ((c = getopt(argc, argv, "46C:d:D:hlLiIN")) != -1) {
@@ -72,7 +72,7 @@ main(int argc, char *argv[])
 			linefeed = false;
 			break;
 		case 'L':
-			assert(0); // TODO: Follow redirects
+			follow_redirects = true;
 			break;
 		case 'i':
 			header_mode = SHOW_HEADERS;
@@ -142,7 +142,16 @@ main(int argc, char *argv[])
 			url = new_url;
 			goto next;
 		case 3: // REDIRECT
-			assert(0); // TODO
+			free(url);
+			url = strdup(resp.meta);
+			if (!follow_redirects) {
+				if (header_mode == OMIT_HEADERS) {
+					fprintf(stderr, "REDIRECT: %d %s\n",
+						resp.status, resp.meta);
+				}
+				exit = true;
+			}
+			goto next;
 		case 6: // CLIENT CERTIFICATE REQUIRED
 			assert(0); // TODO
 		case 4: // TEMPORARY FAILURE
