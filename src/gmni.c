@@ -147,6 +147,7 @@ main(int argc, char *argv[])
 			new_url = gemini_input_url(url, input);
 			free(url);
 			url = new_url;
+			assert(url);
 			goto next;
 		case 3: // REDIRECT
 			free(url);
