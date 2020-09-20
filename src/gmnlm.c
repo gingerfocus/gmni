@@ -17,15 +17,42 @@ struct link {
 	struct link *next;
 };
 
+struct history {
+	char *url;
+	struct history *prev, *next;
+};
+
 static void
 usage(const char *argv_0)
 {
 	fprintf(stderr, "usage: %s [gemini://...]\n", argv_0);
 }
 
-static bool
-set_url(struct Curl_URL *url, char *new_url)
+static void
+history_free(struct history *history)
 {
+	if (!history) {
+		return;
+	}
+	history_free(history->next);
+	free(history);
+}
+
+static bool
+set_url(struct Curl_URL *url, char *new_url, struct history **history)
+{
+	if (history) {
+		struct history *next = calloc(1, sizeof(struct history));
+		next->url = strdup(new_url);
+		next->prev = *history;
+		if (*history) {
+			if ((*history)->next) {
+				history_free((*history)->next);
+			}
+			(*history)->next = next;
+		}
+		*history = next;
+	}
 	if (curl_url_set(url, CURLUPART_URL, new_url, 0) != CURLUE_OK) {
 		fprintf(stderr, "Error: invalid URL\n");
 		return false;
@@ -138,8 +165,9 @@ main(int argc, char *argv[])
 		}
 	}
 
+	struct history *history;
 	if (optind == argc - 1) {
-		set_url(url, argv[optind]);
+		set_url(url, argv[optind], &history);
 	} else {
 		usage(argv[0]);
 		return 1;
@@ -161,9 +189,10 @@ main(int argc, char *argv[])
 		CURLUcode uc = curl_url_get(url, CURLUPART_URL, &plain_url, 0);
 		assert(uc == CURLUE_OK); // Invariant
 
-		snprintf(prompt, sizeof(prompt), "\n\t%s\n"
-			"\tWhere to? [n]: follow Nth link; [o <url>]: open URL; [q]: quit "
-			  "[b]ack; [f]orward\n"
+		snprintf(prompt, sizeof(prompt), "\nat %s\n"
+			"[n]: follow Nth link; [o <url>]: open URL; "
+			"[b]ack; [f]orward; "
+			"[q]uit\n"
 			"=> ", plain_url);
 
 		enum gemini_result res = gemini_request(plain_url, &opts, &resp);
@@ -201,11 +230,29 @@ main(int argc, char *argv[])
 			char *in = NULL;
 			ssize_t n = getline(&in, &l, tty);
 			if (n == -1 && feof(tty)) {
-				prompting = run = false;
+				run = false;
 				break;
 			}
 			if (strcmp(in, "q\n") == 0) {
-				prompting = run = false;
+				run = false;
+				break;
+			}
+			if (strcmp(in, "b\n") == 0) {
+				if (!history->prev) {
+					fprintf(stderr, "At beginning of history\n");
+					continue;
+				}
+				history = history->prev;
+				set_url(url, history->url, NULL);
+				break;
+			}
+			if (strcmp(in, "f\n") == 0) {
+				if (!history->next) {
+					fprintf(stderr, "At end of history\n");
+					continue;
+				}
+				history = history->next;
+				set_url(url, history->url, NULL);
 				break;
 			}
 
@@ -221,23 +268,24 @@ main(int argc, char *argv[])
 				if (!link) {
 					fprintf(stderr, "Error: no such link.\n");
 				} else {
-					prompting = false;
-					set_url(url, link->url);
+					set_url(url, link->url, &history);
+					break;
 				}
 			}
-
-			link = links;
-			while (link) {
-				struct link *next = link->next;
-				free(link->url);
-				free(link);
-				link = next;
-			}
-
 			free(in);
 		}
+
+		struct link *link = links;
+		while (link) {
+			struct link *next = link->next;
+			free(link->url);
+			free(link);
+			link = next;
+		}
+		links = NULL;
 	}
 
+	history_free(history);
 	SSL_CTX_free(opts.ssl_ctx);
 	curl_url_cleanup(url);
 	return 0;
