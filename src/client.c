@@ -104,11 +104,24 @@ gemini_request(const char *url, struct gemini_options *options,
 	if (!uri) {
 		return GEMINI_ERR_OOM;
 	}
-	if (curl_url_set(uri, CURLUPART_URL, url, 0) != CURLUE_OK) {
-		return GEMINI_ERR_INVALID_URL;
-	}
 
 	enum gemini_result res = GEMINI_OK;
+	if (curl_url_set(uri, CURLUPART_URL, url, 0) != CURLUE_OK) {
+		res = GEMINI_ERR_INVALID_URL;
+		goto cleanup;
+	}
+
+	char *scheme;
+	if (curl_url_get(uri, CURLUPART_SCHEME, &scheme, 0) != CURLUE_OK) {
+		res = GEMINI_ERR_INVALID_URL;
+		goto cleanup;
+	} else {
+		if (strcmp(scheme, "gemini") != 0) {
+			res = GEMINI_ERR_NOT_GEMINI;
+			goto cleanup;
+		}
+	}
+
 	if (options && options->ssl_ctx) {
 		resp->ssl_ctx = options->ssl_ctx;
 		SSL_CTX_up_ref(options->ssl_ctx);
@@ -226,6 +239,8 @@ gemini_strerr(enum gemini_result r, struct gemini_response *resp)
 		return "Out of memory";
 	case GEMINI_ERR_INVALID_URL:
 		return "Invalid URL";
+	case GEMINI_ERR_NOT_GEMINI:
+		return "Not a gemini URL";
 	case GEMINI_ERR_RESOLVE:
 		return gai_strerror(resp->status);
 	case GEMINI_ERR_CONNECT:
