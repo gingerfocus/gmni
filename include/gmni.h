@@ -103,4 +103,64 @@ char *gemini_input_url(const char *url, const char *input);
 // of the given Gemini status code.
 enum gemini_status_class gemini_response_class(enum gemini_status status);
 
+enum gemini_tok {
+	GEMINI_TEXT,
+	GEMINI_LINK,
+	GEMINI_PREFORMATTED,
+	GEMINI_HEADING,
+	GEMINI_LIST_ITEM,
+	GEMINI_QUOTE,
+};
+
+struct gemini_token {
+	enum gemini_tok token;
+
+	// The token field determines which of the union members is valid.
+	union {
+		char *text;
+
+		struct {
+			char *text;
+			char *url; // May be NULL
+		} link;
+
+		struct {
+			char *text;
+			char *alt_text; // May be NULL
+		} preformatted;
+
+		struct {
+			char *title;
+			int level; // 1, 2, or 3
+		} heading;
+
+		char *list_item;
+		char *quote_text;
+	};
+};
+
+struct gemini_parser {
+	BIO *f;
+	char *buf;
+	size_t bufsz;
+	size_t bufln;
+};
+
+// Initializes a text/gemini parser which reads from the specified BIO.
+void gemini_parser_init(struct gemini_parser *p, BIO *f);
+
+// Finishes this text/gemini parser and frees up its resources.
+void gemini_parser_finish(struct gemini_parser *p);
+
+// Reads the next token from a text/gemini file.
+// 
+// Returns 0 on success, 1 on EOF, and -1 on failure.
+//
+// Caller must call gemini_token_finish before exiting or re-using the token
+// parameter.
+int gemini_parser_next(struct gemini_parser *p, struct gemini_token *token);
+
+// Must be called after gemini_next to free up resources for the next token.
+void gemini_token_finish(struct gemini_token *token);
+
 #endif

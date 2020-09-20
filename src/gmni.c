@@ -233,9 +233,11 @@ main(int argc, char *argv[])
 			printf("%d %s\n", resp.status, resp.meta);
 			/* fallthrough */
 		case OMIT_HEADERS:
-			if (resp.status / 10 != 2) {
+			if (gemini_response_class(resp.status) !=
+					GEMINI_STATUS_CLASS_SUCCESS) {
 				break;
 			}
+
 			char last;
 			char buf[BUFSIZ];
 			for (int n = 1; n > 0;) {

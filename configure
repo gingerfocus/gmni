@@ -7,6 +7,7 @@ gmni() {
 		src/client.c \
 		src/escape.c \
 		src/gmni.c \
+		src/parser.c \
 		src/url.c
 }
 
