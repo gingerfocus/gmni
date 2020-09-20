@@ -72,7 +72,7 @@ trim_ws(char *in)
 
 static void
 display_gemini(FILE *tty, struct gemini_response *resp,
-		struct link **next, bool pagination)
+	struct link **next, bool pagination)
 {
 	int nlinks = 0;
 	struct gemini_parser p;
@@ -141,6 +141,39 @@ display_gemini(FILE *tty, struct gemini_response *resp,
 	gemini_parser_finish(&p);
 }
 
+static void
+display_plaintext(FILE *tty, struct gemini_response *resp, bool pagination)
+{
+	struct winsize ws;
+	int row = 0, col = 0;
+	ioctl(fileno(tty), TIOCGWINSZ, &ws);
+
+	char buf[BUFSIZ];
+	int n;
+	while ((n = BIO_read(resp->bio, buf, sizeof(buf)) != 0)) {
+		while (n) {
+			n -= fwrite(buf, 1, n, tty);
+		}
+	}
+
+	(void)pagination; (void)row; (void)col; // TODO: generalize pagination
+}
+
+static void
+display_response(FILE *tty, struct gemini_response *resp,
+	struct link **next, bool pagination)
+{
+	if (strcmp(resp->meta, "text/gemini") == 0
+			|| strncmp(resp->meta, "text/gemini;", 12) == 0) {
+		display_gemini(tty, resp, next, pagination);
+		return;
+	}
+	if (strncmp(resp->meta, "text/", 5) == 0) {
+		display_plaintext(tty, resp, pagination);
+		return;
+	}
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -201,6 +234,14 @@ main(int argc, char *argv[])
 			assert(0); // TODO: Prompt
 		}
 
+		snprintf(prompt, sizeof(prompt), "\n%s at %s\n"
+			"[n]: follow Nth link; [o <url>]: open URL; "
+			"[b]ack; [f]orward; "
+			"[q]uit\n"
+			"=> ",
+			resp.status == GEMINI_STATUS_SUCCESS ? resp.meta : "",
+			plain_url);
+
 		switch (gemini_response_class(resp.status)) {
 		case GEMINI_STATUS_CLASS_INPUT:
 			assert(0); // TODO
@@ -216,7 +257,7 @@ main(int argc, char *argv[])
 				resp.status, resp.meta);
 			break;
 		case GEMINI_STATUS_CLASS_SUCCESS:
-			display_gemini(tty, &resp, &links, pagination);
+			display_response(tty, &resp, &links, pagination);
 			break;
 		}
 
