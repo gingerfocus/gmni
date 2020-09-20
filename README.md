@@ -1,6 +1,9 @@
 # gmni - A Gemini client
 
-This is a [Gemini](https://gemini.circumlunar.space/) client.
+This is a [Gemini](https://gemini.circumlunar.space/) client. Included are:
+
+- A CLI utility (like curl): gmni
+- A [line-mode browser](https://en.wikipedia.org/wiki/Line_Mode_Browser): gmnlm
 
 Dependencies:
 
@@ -19,4 +22,4 @@ $ make
 
 ## Usage
 
-See `gmni(1)` for the CLI usage.
+See `gmni(1)`, `gmnlm(1)`.
