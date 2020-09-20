@@ -71,16 +71,20 @@ main(int argc, char *argv[])
 		INPUT_READ,
 		INPUT_SUPPRESS,
 	};
+
 	enum input_mode input_mode = INPUT_READ;
 	FILE *input_source = stdin;
+
 	bool follow_redirects = false, linefeed = true;
+	int max_redirect = 5;
+
 	struct addrinfo hints = {0};
 	struct gemini_options opts = {
 		.hints = &hints,
 	};
 
 	int c;
-	while ((c = getopt(argc, argv, "46d:D:E:hlLiIN")) != -1) {
+	while ((c = getopt(argc, argv, "46d:D:E:hlLiINR:")) != -1) {
 		switch (c) {
 		case '4':
 			hints.ai_family = AF_INET;
@@ -127,6 +131,15 @@ main(int argc, char *argv[])
 		case 'N':
 			input_mode = INPUT_SUPPRESS;
 			break;
+		case 'R':;
+			char *endptr;
+			errno = 0;
+			max_redirect = strtoul(optarg, &endptr, 10);
+			if (*endptr || errno != 0) {
+				fprintf(stderr, "Error: -R expects numeric argument\n");
+				return 1;
+			}
+			break;
 		default:
 			fprintf(stderr, "fatal: unknown flag %c\n", c);
 			return 1;
@@ -144,7 +157,7 @@ main(int argc, char *argv[])
 	bool exit = false;
 	char *url = strdup(argv[optind]);
 
-	int ret = 0;
+	int ret = 0, nredir = 0;
 	while (!exit) {
 		struct gemini_response resp;
 		enum gemini_result r = gemini_request(url, &opts, &resp);
@@ -177,6 +190,14 @@ main(int argc, char *argv[])
 			url = new_url;
 			goto next;
 		case GEMINI_STATUS_CLASS_REDIRECT:
+			if (++nredir >= max_redirect) {
+				fprintf(stderr,
+					"Error: maximum redirects (%d) exceeded",
+					max_redirect);
+				exit = true;
+				goto next;
+			}
+
 			free(url);
 			url = strdup(resp.meta);
 			if (!follow_redirects) {
