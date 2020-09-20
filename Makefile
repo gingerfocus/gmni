@@ -31,4 +31,10 @@ clean:
 distclean: clean
 	@rm -rf "$(OUTDIR)"
 
-.PHONY: clean distclean docs
+install: all
+	mkdir -p $(BINDIR)
+	mkdir -p $(MANDIR)/man1
+	install -Dm755 gmni $(BINDIR)/gmni
+	install -Dm644 doc/gmni.1 $(MANDIR)/man1/gmni.1
+
+.PHONY: clean distclean docs install
