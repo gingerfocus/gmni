@@ -5,7 +5,6 @@ AS=${AS:-as}
 CC=${CC:-cc}
 CFLAGS=${CFLAGS:-}
 LD=${LD:-ld}
-LIBSSL=
 
 for arg
 do
@@ -13,9 +12,6 @@ do
 	case "$arg" in
 		--prefix=*)
 			PREFIX=${arg#*=}
-			;;
-		--with-libssl=*)
-			LIBSSL=${arg#*=}
 			;;
 	esac
 done
