@@ -4,11 +4,11 @@ OUTDIR=.build
 include $(OUTDIR)/config.mk
 include $(OUTDIR)/cppcache
 
-gmnic: $(gmnic_objects)
+gmni: $(gmni_objects)
 	@printf 'CCLD\t$@\n'
-	@$(CC) $(LDFLAGS) $(LIBS) -o $@ $(gmnic_objects)
+	@$(CC) $(LDFLAGS) $(LIBS) -o $@ $(gmni_objects)
 
-doc/gmnic.1: doc/gmnic.scd
+doc/gmni.1: doc/gmni.scd
 
 .SUFFIXES: .c .o .scd .1
 
@@ -23,10 +23,10 @@ doc/gmnic.1: doc/gmnic.scd
 	@printf 'SCDOC\t$@\n'
 	@$(SCDOC) < $< > $@
 
-docs: doc/gmnic.1
+docs: doc/gmni.1
 
 clean:
-	@rm -f gmnic
+	@rm -f gmni doc/gmni.1
 
 distclean: clean
 	@rm -rf "$(OUTDIR)"

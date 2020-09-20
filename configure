@@ -3,13 +3,13 @@ srcdir=${SRCDIR:-$(dirname "$0")}
 eval ". $srcdir/config.sh"
 
 gmni() {
-	genrules gmnic \
+	genrules gmni \
 		src/client.c \
 		src/escape.c \
-		src/gmnic.c \
+		src/gmni.c \
 		src/url.c
 }
 
-all="gmnic"
+all="gmni"
 
 run_configure

@@ -1,16 +1,16 @@
-gmnic(1)
+gmni(1)
 
 # NAME
 
-gmnic - Gemini client
+gmni - Gemini client
 
 # SYNPOSIS
 
-*gmnic* [-46lLiIN] [-E _path_] [-d _input_] [-D _path_] _gemini://..._
+*gmni* [-46lLiIN] [-E _path_] [-d _input_] [-D _path_] _gemini://..._
 
 # DESCRIPTION
 
-*gmnic* executes a gemini request and, if successful, prints the response body
+*gmni* executes a gemini request and, if successful, prints the response body
 to stdout.
 
 If an error is returned, information is printed to stderr and the process exits
@@ -45,7 +45,7 @@ performed with the user's input supplied to the server.
 	an empty password.
 
 *-l*
-	For *text/\** responses, gmnic normally adds a line feed if stdout is a
+	For *text/\** responses, *gmni* normally adds a line feed if stdout is a
 	TTY and the response body does not include one. This flag suppresses
 	this behavior.
 
