@@ -8,7 +8,9 @@ gmnic: $(gmnic_objects)
 	@printf 'CCLD\t$@\n'
 	@$(CC) $(LDFLAGS) $(LIBS) -o $@ $(gmnic_objects)
 
-.SUFFIXES: .c .o
+doc/gmnic.1: doc/gmnic.scd
+
+.SUFFIXES: .c .o .scd .1
 
 .c.o:
 	@printf 'CC\t$@\n'
@@ -17,10 +19,16 @@ gmnic: $(gmnic_objects)
 		$(CPP) $(CFLAGS) -MM -MT $@ $< >> $(OUTDIR)/cppcache
 	@$(CC) -c $(CFLAGS) -o $@ $<
 
+.scd.1:
+	@printf 'SCDOC\t$@\n'
+	@$(SCDOC) < $< > $@
+
+docs: doc/gmnic.1
+
 clean:
 	@rm -f gmnic
 
 distclean: clean
 	@rm -rf "$(OUTDIR)"
 
-.PHONY: clean distclean
+.PHONY: clean distclean docs

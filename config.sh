@@ -5,6 +5,7 @@ AS=${AS:-as}
 CC=${CC:-cc}
 CFLAGS=${CFLAGS:-}
 LD=${LD:-ld}
+SCDOC=${SCDOC:-scdoc}
 
 for arg
 do
@@ -104,9 +105,19 @@ run_configure() {
 	find_library OpenSSL libssl
 	find_library OpenSSL libcrypto
 
+	printf "Checking for scdoc... "
+	if scdoc -v >/dev/null 2>&1
+	then
+		echo yes
+		all="$all docs"
+	else
+		echo no
+	fi
+
 	printf "Creating $outdir/config.mk... "
 	cat <<-EOF > "$outdir"/config.mk
 	CC=$CC
+	SCDOC=$SCDOC
 	LIBS=$LIBS
 	PREFIX=${PREFIX:-/usr/local}
 	OUTDIR=${outdir}
@@ -153,6 +164,7 @@ run_configure() {
 	printf "Populating build dir... "
 	populate "$srcdir/include"
 	populate "$srcdir/src"
+	populate "$srcdir/doc"
 	ln -sf "$srcdir"/Makefile ./
 	echo done
 }
