@@ -68,4 +68,8 @@ void gemini_response_finish(struct gemini_response *resp);
 // Returns a user-friendly string describing an error.
 const char *gemini_strerr(enum gemini_result r, struct gemini_response *resp);
 
+// Returns the given URL with the input response set to the specified value.
+// The caller must free the string.
+char *gemini_input_url(const char *url, const char *input);
+
 #endif

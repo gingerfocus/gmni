@@ -176,7 +176,7 @@ gemini_request(const char *url, struct gemini_options *options,
 
 	char *endptr;
 	resp->status = (int)strtol(buf, &endptr, 10);
-	if (*endptr != ' ' || resp->status <= 10 || resp->status >= 70) {
+	if (*endptr != ' ' || resp->status < 10 || resp->status >= 70) {
 		res = GEMINI_ERR_PROTOCOL;
 		goto cleanup;
 	}
@@ -195,14 +195,25 @@ gemini_response_finish(struct gemini_response *resp)
 	if (!resp) {
 		return;
 	}
+
 	if (resp->fd != -1) {
 		close(resp->fd);
+		resp->fd = -1;
 	}
-	BIO_free(BIO_pop(resp->bio)); // ssl bio
-	BIO_free(resp->bio); // buffered bio
+
+	if (resp->bio) {
+		BIO_free(BIO_pop(resp->bio)); // ssl bio
+		BIO_free(resp->bio); // buffered bio
+		resp->bio = NULL;
+	}
+
 	SSL_free(resp->ssl);
 	SSL_CTX_free(resp->ssl_ctx);
 	free(resp->meta);
+
+	resp->ssl = NULL;
+	resp->ssl_ctx = NULL;
+	resp->meta = NULL;
 }
 
 const char *
@@ -229,4 +240,27 @@ gemini_strerr(enum gemini_result r, struct gemini_response *resp)
 		return "Protocol error";
 	}
 	assert(0);
+}
+
+char *
+gemini_input_url(const char *url, const char *input)
+{
+	char *new_url = NULL;
+	struct Curl_URL *uri = curl_url();
+	if (!uri) {
+		return NULL;
+	}
+	if (curl_url_set(uri, CURLUPART_URL, url, 0) != CURLUE_OK) {
+		goto cleanup;
+	}
+	if (curl_url_set(uri, CURLUPART_QUERY, input, CURLU_URLENCODE) != CURLUE_OK) {
+		goto cleanup;
+	}
+	if (curl_url_get(uri, CURLUPART_URL, &new_url, 0) != CURLUE_OK) {
+		new_url = NULL;
+		goto cleanup;
+	}
+cleanup:
+	curl_url_cleanup(uri);
+	return new_url;
 }
