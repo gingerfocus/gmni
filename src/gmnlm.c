@@ -217,49 +217,65 @@ main(int argc, char *argv[])
 	while (run) {
 		struct link *links;
 		static char prompt[4096];
-
 		char *plain_url;
-		CURLUcode uc = curl_url_get(url, CURLUPART_URL, &plain_url, 0);
-		assert(uc == CURLUE_OK); // Invariant
 
-		snprintf(prompt, sizeof(prompt), "\nat %s\n"
-			"[n]: follow Nth link; [o <url>]: open URL; "
-			"[b]ack; [f]orward; "
-			"[q]uit\n"
-			"=> ", plain_url);
+		int nredir = 0;
+		bool requesting = true;
+		while (requesting) {
+			CURLUcode uc = curl_url_get(url, CURLUPART_URL, &plain_url, 0);
+			assert(uc == CURLUE_OK); // Invariant
 
-		enum gemini_result res = gemini_request(plain_url, &opts, &resp);
-		if (res != GEMINI_OK) {
-			fprintf(stderr, "Error: %s\n", gemini_strerr(res, &resp));
-			assert(0); // TODO: Prompt
+			enum gemini_result res = gemini_request(
+				plain_url, &opts, &resp);
+			if (res != GEMINI_OK) {
+				fprintf(stderr, "Error: %s\n",
+					gemini_strerr(res, &resp));
+				requesting = false;
+				break;
+			}
+
+			switch (gemini_response_class(resp.status)) {
+			case GEMINI_STATUS_CLASS_INPUT:
+				assert(0); // TODO
+			case GEMINI_STATUS_CLASS_REDIRECT:
+				if (++nredir >= 5) {
+					requesting = false;
+					fprintf(stderr, "Error: maximum redirects (5) exceeded");
+					break;
+				}
+				fprintf(stderr,
+					"Following redirect to %s\n", resp.meta);
+				set_url(url, resp.meta, NULL);
+				break;
+			case GEMINI_STATUS_CLASS_CLIENT_CERTIFICATE_REQUIRED:
+				assert(0); // TODO
+			case GEMINI_STATUS_CLASS_TEMPORARY_FAILURE:
+			case GEMINI_STATUS_CLASS_PERMANENT_FAILURE:
+				requesting = false;
+				fprintf(stderr, "Server returned %s %d %s\n",
+					resp.status / 10 == 4 ?
+					"TEMPORARY FAILURE" : "PERMANENT FALIURE",
+					resp.status, resp.meta);
+				break;
+			case GEMINI_STATUS_CLASS_SUCCESS:
+				requesting = false;
+				display_response(tty, &resp, &links, pagination);
+				break;
+			}
+
+			if (requesting) {
+				gemini_response_finish(&resp);
+			}
 		}
 
-		snprintf(prompt, sizeof(prompt), "\n%s at %s\n"
+		snprintf(prompt, sizeof(prompt), "\n%s%s at %s\n"
 			"[n]: follow Nth link; [o <url>]: open URL; "
 			"[b]ack; [f]orward; "
 			"[q]uit\n"
 			"=> ",
+			resp.status == GEMINI_STATUS_SUCCESS ? " " : "",
 			resp.status == GEMINI_STATUS_SUCCESS ? resp.meta : "",
 			plain_url);
-
-		switch (gemini_response_class(resp.status)) {
-		case GEMINI_STATUS_CLASS_INPUT:
-			assert(0); // TODO
-		case GEMINI_STATUS_CLASS_REDIRECT:
-			assert(0); // TODO
-		case GEMINI_STATUS_CLASS_CLIENT_CERTIFICATE_REQUIRED:
-			assert(0); // TODO
-		case GEMINI_STATUS_CLASS_TEMPORARY_FAILURE:
-		case GEMINI_STATUS_CLASS_PERMANENT_FAILURE:
-			fprintf(stderr, "Server returned %s %d %s\n",
-				resp.status / 10 == 4 ?
-				"TEMPORARY FAILURE" : "PERMANENT FALIURE",
-				resp.status, resp.meta);
-			break;
-		case GEMINI_STATUS_CLASS_SUCCESS:
-			display_response(tty, &resp, &links, pagination);
-			break;
-		}
 
 		gemini_response_finish(&resp);
 
