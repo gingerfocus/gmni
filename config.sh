@@ -5,6 +5,7 @@ AS=${AS:-as}
 CC=${CC:-cc}
 CFLAGS=${CFLAGS:-}
 LD=${LD:-ld}
+LIBSSL=
 
 for arg
 do
@@ -12,6 +13,9 @@ do
 	case "$arg" in
 		--prefix=*)
 			PREFIX=${arg#*=}
+			;;
+		--with-libssl=*)
+			LIBSSL=${arg#*=}
 			;;
 	esac
 done
@@ -72,12 +76,27 @@ test_cflags() {
 	fi
 }
 
+find_library() {
+	name="$1"
+	pc="$2"
+	printf "Checking for %s... " "$name"
+	if ! pkg-config "$pc" 2>/dev/null
+	then
+		printf "NOT FOUND\n"
+		printf "Tried pkg-config %s\n" "$pc"
+		return 1
+	fi
+	printf "OK\n"
+	CFLAGS="$CFLAGS $(pkg-config --cflags "$pc")"
+	LIBS="$LIBS $(pkg-config --libs "$pc")"
+}
+
 run_configure() {
 	mkdir -p $outdir
 
 	for flag in -g -std=c11 -D_XOPEN_SOURCE=700 -Wall -Wextra -Werror -pedantic
 	do
-		printf "Checking for $flag... "
+		printf "Checking for %s... " "$flag"
 		if test_cflags "$flag"
 		then
 			echo yes
@@ -86,9 +105,13 @@ run_configure() {
 		fi
 	done
 
+	find_library OpenSSL libssl
+	find_library OpenSSL libcrypto
+
 	printf "Creating $outdir/config.mk... "
 	cat <<-EOF > "$outdir"/config.mk
 	CC=$CC
+	LIBS=$LIBS
 	PREFIX=${PREFIX:-/usr/local}
 	OUTDIR=${outdir}
 	_INSTDIR=\$(DESTDIR)\$(PREFIX)
