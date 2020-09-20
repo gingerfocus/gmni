@@ -11,7 +11,7 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <unistd.h>
-#include "client.h"
+#include "gmni.h"
 
 static void
 usage(char *argv_0)
@@ -120,8 +120,8 @@ main(int argc, char *argv[])
 		}
 
 		char *new_url, *input = NULL;
-		switch (resp.status / 10) {
-		case 1: // INPUT
+		switch (gemini_response_class(resp.status)) {
+		case GEMINI_STATUS_CLASS_INPUT:
 			if (input_mode == INPUT_SUPPRESS) {
 				exit = true;
 				break;
@@ -149,7 +149,7 @@ main(int argc, char *argv[])
 			url = new_url;
 			assert(url);
 			goto next;
-		case 3: // REDIRECT
+		case GEMINI_STATUS_CLASS_REDIRECT:
 			free(url);
 			url = strdup(resp.meta);
 			if (!follow_redirects) {
@@ -160,10 +160,10 @@ main(int argc, char *argv[])
 				exit = true;
 			}
 			goto next;
-		case 6: // CLIENT CERTIFICATE REQUIRED
+		case GEMINI_STATUS_CLASS_CLIENT_CERTIFICATE_REQUIRED:
 			assert(0); // TODO
-		case 4: // TEMPORARY FAILURE
-		case 5: // PERMANENT FAILURE
+		case GEMINI_STATUS_CLASS_TEMPORARY_FAILURE:
+		case GEMINI_STATUS_CLASS_PERMANENT_FAILURE:
 			if (header_mode == OMIT_HEADERS) {
 				fprintf(stderr, "%s: %d %s\n",
 					resp.status / 10 == 4 ?
@@ -172,7 +172,7 @@ main(int argc, char *argv[])
 			}
 			exit = true;
 			break;
-		case 2: // SUCCESS
+		case GEMINI_STATUS_CLASS_SUCCESS:
 			exit = true;
 			break;
 		}

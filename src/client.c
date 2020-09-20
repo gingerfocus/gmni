@@ -9,7 +9,7 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <unistd.h>
-#include "client.h"
+#include "gmni.h"
 #include "url.h"
 
 static enum gemini_result
@@ -263,4 +263,10 @@ gemini_input_url(const char *url, const char *input)
 cleanup:
 	curl_url_cleanup(uri);
 	return new_url;
+}
+
+enum gemini_status_class
+gemini_response_class(enum gemini_status status)
+{
+	return status / 10;
 }

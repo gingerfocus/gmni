@@ -4,8 +4,49 @@
 #include <openssl/ssl.h>
 #include <sys/socket.h>
 
+enum gemini_result {
+	GEMINI_OK,
+	GEMINI_ERR_OOM,
+	GEMINI_ERR_INVALID_URL,
+	GEMINI_ERR_RESOLVE,
+	GEMINI_ERR_CONNECT,
+	GEMINI_ERR_SSL,
+	GEMINI_ERR_IO,
+	GEMINI_ERR_PROTOCOL,
+};
+
+enum gemini_status {
+	GEMINI_STATUS_INPUT = 10,
+	GEMINI_STATUS_SENSITIVE_INPUT = 11,
+	GEMINI_STATUS_SUCCESS = 20,
+	GEMINI_STATUS_REDIRECT_TEMPORARY = 30,
+	GEMINI_STATUS_REDIRECT_PERMANENT = 31,
+	GEMINI_STATUS_TEMPORARY_FAILURE = 40,
+	GEMINI_STATUS_SERVER_UNAVAILABLE = 41,
+	GEMINI_STATUS_CGI_ERROR = 42,
+	GEMINI_STATUS_PROXY_ERROR = 43,
+	GEMINI_STATUS_SLOW_DOWN = 44,
+	GEMINI_STATUS_PERMANENT_FAILURE = 50,
+	GEMINI_STATUS_NOT_FOUND = 51,
+	GEMINI_STATUS_GONE = 52,
+	GEMINI_STATUS_PROXY_REQUEST_REFUSED = 53,
+	GEMINI_STATUS_BAD_REQUEST = 59,
+	GEMINI_STATUS_CLIENT_CERTIFICATE_REQUIRED = 60,
+	GEMINI_STATUS_CERTIFICATE_NOT_AUTHORIZED = 61,
+	GEMINI_STATUS_CERTIFICATE_NOT_VALID = 62,
+};
+
+enum gemini_status_class {
+	GEMINI_STATUS_CLASS_INPUT = 10,
+	GEMINI_STATUS_CLASS_SUCCESS = 20,
+	GEMINI_STATUS_CLASS_REDIRECT = 30,
+	GEMINI_STATUS_CLASS_TEMPORARY_FAILURE = 40,
+	GEMINI_STATUS_CLASS_PERMANENT_FAILURE = 50,
+	GEMINI_STATUS_CLASS_CLIENT_CERTIFICATE_REQUIRED = 60,
+};
+
 struct gemini_response {
-	int status;
+	enum gemini_status status;
 	char *meta;
 
 	// Response body may be read from here if appropriate:
@@ -35,17 +76,6 @@ struct gemini_options {
 	struct addrinfo *hints;
 };
 
-enum gemini_result {
-	GEMINI_OK,
-	GEMINI_ERR_OOM,
-	GEMINI_ERR_INVALID_URL,
-	GEMINI_ERR_RESOLVE,
-	GEMINI_ERR_CONNECT,
-	GEMINI_ERR_SSL,
-	GEMINI_ERR_IO,
-	GEMINI_ERR_PROTOCOL,
-};
-
 // Requests the specified URL via the gemini protocol. If options is non-NULL,
 // it may specify some additional configuration to adjust client behavior.
 //
@@ -67,5 +97,9 @@ const char *gemini_strerr(enum gemini_result r, struct gemini_response *resp);
 // Returns the given URL with the input response set to the specified value.
 // The caller must free the string.
 char *gemini_input_url(const char *url, const char *input);
+
+// Returns the general response class (i.e. with the second digit set to zero)
+// of the given Gemini status code.
+enum gemini_status_class gemini_response_class(enum gemini_status status);
 
 #endif
