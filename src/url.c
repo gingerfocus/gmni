@@ -1361,19 +1361,6 @@ CURLUcode curl_url_set(struct Curl_URL *u, CURLUPart what,
       char *enc = malloc(nalloc * 3 + 1); /* for worst case! */
       if(!enc)
         return CURLUE_OUT_OF_MEMORY;
-      if(plusencode) {
-        /* space to plus */
-        i = part;
-        for(o = enc; *i; ++o, ++i)
-          *o = (*i == ' ') ? '+' : *i;
-        *o = 0; /* zero terminate */
-        part = strdup(enc);
-        if(!part) {
-          free(enc);
-          return CURLUE_OUT_OF_MEMORY;
-        }
-        free_part = true;
-      }
       for(i = part, o = enc; *i; i++) {
         if(Curl_isunreserved(*i) ||
            ((*i == '/') && urlskipslash) ||
