@@ -34,9 +34,10 @@ main(int argc, char *argv[])
 	};
 	enum input_mode input_mode = INPUT_READ;
 	FILE *input_source = stdin;
+	bool linefeed = true;
 
 	int c;
-	while ((c = getopt(argc, argv, "46C:d:D:hLiIN")) != -1) {
+	while ((c = getopt(argc, argv, "46C:d:D:hlLiIN")) != -1) {
 		switch (c) {
 		case '4':
 			assert(0); // TODO
@@ -67,6 +68,9 @@ main(int argc, char *argv[])
 		case 'h':
 			usage(argv[0]);
 			return 0;
+		case 'l':
+			linefeed = false;
+			break;
 		case 'L':
 			assert(0); // TODO: Follow redirects
 			break;
@@ -81,7 +85,7 @@ main(int argc, char *argv[])
 			input_mode = INPUT_SUPPRESS;
 			break;
 		default:
-			fprintf(stderr, "fatal: unknown flag %c", c);
+			fprintf(stderr, "fatal: unknown flag %c\n", c);
 			return 1;
 		}
 	}
@@ -167,8 +171,9 @@ main(int argc, char *argv[])
 			if (resp.status / 10 != 2) {
 				break;
 			}
-			for (int n = 1; n > 0;) {
-				char buf[BUFSIZ];
+			char buf[BUFSIZ];
+			int n;
+			for (n = 1; n > 0;) {
 				n = BIO_read(resp.bio, buf, BUFSIZ);
 				if (n == -1) {
 					fprintf(stderr, "Error: read\n");
@@ -184,6 +189,11 @@ main(int argc, char *argv[])
 					}
 					w += x;
 				}
+			}
+			if (strncmp(resp.meta, "text/", 5) == 0
+					&& linefeed
+					&& buf[n - 1] != '\n') {
+				printf("\n");
 			}
 			break;
 		}
