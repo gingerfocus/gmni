@@ -175,7 +175,7 @@ gemini_request(const char *url, struct gemini_options *options,
 	}
 
 	char *endptr;
-	resp->status = (int)strtol(buf, &endptr, 10);
+	resp->status = (enum gemini_status)strtol(buf, &endptr, 10);
 	if (*endptr != ' ' || resp->status < 10 || resp->status >= 70) {
 		res = GEMINI_ERR_PROTOCOL;
 		goto cleanup;
@@ -268,5 +268,5 @@ cleanup:
 enum gemini_status_class
 gemini_response_class(enum gemini_status status)
 {
-	return status / 10;
+	return status / 10 * 10;
 }

@@ -10,6 +10,7 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <termios.h>
 #include <unistd.h>
 #include "gmni.h"
 
@@ -19,6 +20,41 @@ usage(char *argv_0)
 	fprintf(stderr,
 		"usage: %s [-46lLiIN] [-E cert] [-d input] [-D path] gemini://...\n",
 		argv_0);
+}
+
+static char *
+get_input(const struct gemini_response *resp, FILE *source)
+{
+	int r = 0;
+	struct termios attrs;
+	bool tty = fileno(source) != -1 && isatty(fileno(source));
+	char *input = NULL;
+	if (tty) {
+		fprintf(stderr, "%s: ", resp->meta);
+		if (resp->status == GEMINI_STATUS_SENSITIVE_INPUT) {
+			r = tcgetattr(fileno(source), &attrs);
+			struct termios new_attrs;
+			r = tcgetattr(fileno(source), &new_attrs);
+			if (r != -1) {
+				new_attrs.c_lflag &= ~ECHO;
+				tcsetattr(fileno(source), TCSANOW, &new_attrs);
+			}
+		}
+	}
+	size_t s = 0;
+	ssize_t n = getline(&input, &s, source);
+	if (n == -1) {
+		fprintf(stderr, "Error reading input: %s\n",
+			feof(source) ? "EOF" :
+			strerror(ferror(source)));
+		return NULL;
+	}
+	input[n - 1] = '\0'; // Drop LF
+	if (tty && resp->status == GEMINI_STATUS_SENSITIVE_INPUT && r != -1) {
+		attrs.c_lflag &= ~ECHO;
+		tcsetattr(fileno(source), TCSANOW, &attrs);
+	}
+	return input;
 }
 
 int
@@ -119,7 +155,6 @@ main(int argc, char *argv[])
 			goto next;
 		}
 
-		char *new_url, *input = NULL;
 		switch (gemini_response_class(resp.status)) {
 		case GEMINI_STATUS_CLASS_INPUT:
 			if (input_mode == INPUT_SUPPRESS) {
@@ -127,27 +162,19 @@ main(int argc, char *argv[])
 				break;
 			}
 
-			if (fileno(input_source) != -1 &&
-					isatty(fileno(input_source))) {
-				fprintf(stderr, "%s: ", resp.meta);
-			}
-
-			size_t s = 0;
-			ssize_t n = getline(&input, &s, input_source);
-			if (n == -1) {
-				fprintf(stderr, "Error reading input: %s\n",
-					feof(input_source) ? "EOF" :
-					strerror(ferror(input_source)));
+			char *input = get_input(&resp, input_source);
+			if (!input) {
 				r = 1;
 				exit = true;
 				break;
 			}
-			input[n - 1] = '\0'; // Drop LF
 
-			new_url = gemini_input_url(url, input);
+			char *new_url = gemini_input_url(url, input);
+			assert(new_url);
+
+			free(input);
 			free(url);
 			url = new_url;
-			assert(url);
 			goto next;
 		case GEMINI_STATUS_CLASS_REDIRECT:
 			free(url);
