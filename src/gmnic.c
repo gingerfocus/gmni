@@ -17,7 +17,7 @@ static void
 usage(char *argv_0)
 {
 	fprintf(stderr,
-		"usage: %s [-LI] [-C cert] [-d input] gemini://...\n",
+		"usage: %s [-46lLiIN] [-C cert] [-d input] [-D path] gemini://...\n",
 		argv_0);
 }
 
@@ -209,7 +209,8 @@ main(int argc, char *argv[])
 				}
 			}
 			if (strncmp(resp.meta, "text/", 5) == 0
-					&& linefeed && last != '\n') {
+					&& linefeed && last != '\n'
+					&& isatty(STDOUT_FILENO)) {
 				printf("\n");
 			}
 			break;
