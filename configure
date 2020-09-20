@@ -1,0 +1,12 @@
+#!/bin/sh -e
+srcdir=${SRCDIR:-$(dirname "$0")}
+eval ". $srcdir/config.sh"
+
+gmni() {
+	genrules gmnic \
+		src/gmnic.c
+}
+
+all="gmnic"
+
+run_configure

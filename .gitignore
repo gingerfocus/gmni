@@ -1,0 +1,5 @@
+.build
+build
+gmnic
+*.1
+*.o
