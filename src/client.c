@@ -31,8 +31,8 @@ gemini_get_addrinfo(struct Curl_URL *uri, struct gemini_options *options,
 			hints = *options->hints;
 		} else {
 			hints.ai_family = AF_UNSPEC;
-			hints.ai_socktype = SOCK_STREAM;
 		}
+		hints.ai_socktype = SOCK_STREAM;
 
 		char pbuf[7];
 		snprintf(pbuf, sizeof(pbuf), "%d", port);
