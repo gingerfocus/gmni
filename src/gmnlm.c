@@ -192,6 +192,40 @@ display_response(struct browser *browser, struct gemini_response *resp)
 }
 
 static char *
+get_input(const struct gemini_response *resp, FILE *source)
+{
+	int r = 0;
+	struct termios attrs;
+	bool tty = fileno(source) != -1 && isatty(fileno(source));
+	char *input = NULL;
+	if (tty) {
+		fprintf(stderr, "%s: ", resp->meta);
+		if (resp->status == GEMINI_STATUS_SENSITIVE_INPUT) {
+			r = tcgetattr(fileno(source), &attrs);
+			struct termios new_attrs;
+			r = tcgetattr(fileno(source), &new_attrs);
+			if (r != -1) {
+				new_attrs.c_lflag &= ~ECHO;
+				tcsetattr(fileno(source), TCSANOW, &new_attrs);
+			}
+		}
+	}
+	size_t s = 0;
+	ssize_t n = getline(&input, &s, source);
+	if (n == -1) {
+		fprintf(stderr, "Error reading input: %s\n",
+			feof(source) ? "EOF" : strerror(ferror(source)));
+		return NULL;
+	}
+	input[n - 1] = '\0'; // Drop LF
+	if (tty && resp->status == GEMINI_STATUS_SENSITIVE_INPUT && r != -1) {
+		attrs.c_lflag &= ~ECHO;
+		tcsetattr(fileno(source), TCSANOW, &attrs);
+	}
+	return input;
+}
+
+static char *
 do_requests(struct browser *browser, struct gemini_response *resp)
 {
 	char *plain_url;
@@ -210,9 +244,19 @@ do_requests(struct browser *browser, struct gemini_response *resp)
 			break;
 		}
 
+		char *input;
 		switch (gemini_response_class(resp->status)) {
 		case GEMINI_STATUS_CLASS_INPUT:
-			assert(0); // TODO
+			input = get_input(resp, browser->tty);
+			if (!input) {
+				requesting = false;
+				break;
+			}
+
+			char *new_url = gemini_input_url(plain_url, input);
+			assert(new_url);
+			set_url(browser, new_url, NULL);
+			break;
 		case GEMINI_STATUS_CLASS_REDIRECT:
 			if (++nredir >= 5) {
 				requesting = false;
