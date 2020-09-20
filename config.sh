@@ -134,6 +134,7 @@ run_configure() {
 	all: ${all}
 	EOF
 	gmni >>"$outdir"/config.mk
+	gmnlm >>"$outdir"/config.mk
 	echo done
 
 	touch $outdir/cppcache

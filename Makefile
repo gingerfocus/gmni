@@ -8,6 +8,10 @@ gmni: $(gmni_objects)
 	@printf 'CCLD\t$@\n'
 	@$(CC) $(LDFLAGS) $(LIBS) -o $@ $(gmni_objects)
 
+gmnlm: $(gmnlm_objects)
+	@printf 'CCLD\t$@\n'
+	@$(CC) $(LDFLAGS) $(LIBS) -o $@ $(gmnlm_objects)
+
 doc/gmni.1: doc/gmni.scd
 
 .SUFFIXES: .c .o .scd .1

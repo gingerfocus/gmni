@@ -7,10 +7,18 @@ gmni() {
 		src/client.c \
 		src/escape.c \
 		src/gmni.c \
+		src/url.c
+}
+
+gmnlm() {
+	genrules gmnlm \
+		src/client.c \
+		src/escape.c \
+		src/gmnlm.c \
 		src/parser.c \
 		src/url.c
 }
 
-all="gmni"
+all="gmni gmnlm"
 
 run_configure

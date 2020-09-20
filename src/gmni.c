@@ -15,7 +15,7 @@
 #include "gmni.h"
 
 static void
-usage(char *argv_0)
+usage(const char *argv_0)
 {
 	fprintf(stderr,
 		"usage: %s [-46lLiIN] [-E cert] [-d input] [-D path] gemini://...\n",
