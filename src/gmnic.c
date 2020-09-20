@@ -171,13 +171,15 @@ main(int argc, char *argv[])
 			if (resp.status / 10 != 2) {
 				break;
 			}
+			char last;
 			char buf[BUFSIZ];
-			int n;
-			for (n = 1; n > 0;) {
+			for (int n = 1; n > 0;) {
 				n = BIO_read(resp.bio, buf, BUFSIZ);
 				if (n == -1) {
 					fprintf(stderr, "Error: read\n");
 					return 1;
+				} else if (n != 0) {
+					last = buf[n - 1];
 				}
 				ssize_t w = 0;
 				while (w < (ssize_t)n) {
@@ -191,8 +193,7 @@ main(int argc, char *argv[])
 				}
 			}
 			if (strncmp(resp.meta, "text/", 5) == 0
-					&& linefeed
-					&& buf[n - 1] != '\n') {
+					&& linefeed && last != '\n') {
 				printf("\n");
 			}
 			break;
@@ -202,7 +203,6 @@ next:
 		gemini_response_finish(&resp);
 	}
 
-	(void)input_mode;
 	free(url);
 	return ret;
 }
