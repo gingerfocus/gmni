@@ -17,7 +17,7 @@ static void
 usage(char *argv_0)
 {
 	fprintf(stderr,
-		"usage: %s [-46lLiIN] [-C cert] [-d input] [-D path] gemini://...\n",
+		"usage: %s [-46lLiIN] [-E cert] [-d input] [-D path] gemini://...\n",
 		argv_0);
 }
 
@@ -44,16 +44,13 @@ main(int argc, char *argv[])
 	};
 
 	int c;
-	while ((c = getopt(argc, argv, "46C:d:D:hlLiIN")) != -1) {
+	while ((c = getopt(argc, argv, "46d:D:E:hlLiIN")) != -1) {
 		switch (c) {
 		case '4':
 			hints.ai_family = AF_INET;
 			break;
 		case '6':
 			hints.ai_family = AF_INET6;
-			break;
-		case 'C':
-			assert(0); // TODO: Client certificates
 			break;
 		case 'd':
 			input_mode = INPUT_READ;
@@ -71,6 +68,9 @@ main(int argc, char *argv[])
 					return 1;
 				}
 			}
+			break;
+		case 'E':
+			assert(0); // TODO: Client certificates
 			break;
 		case 'h':
 			usage(argv[0]);
