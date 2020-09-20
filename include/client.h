@@ -39,11 +39,8 @@ enum gemini_result {
 	GEMINI_OK,
 	GEMINI_ERR_OOM,
 	GEMINI_ERR_INVALID_URL,
-	// status is set to the return value from getaddrinfo
 	GEMINI_ERR_RESOLVE,
-	// status is set to errno
 	GEMINI_ERR_CONNECT,
-	// use SSL_get_error(resp->ssl, resp->status) to get details
 	GEMINI_ERR_SSL,
 	GEMINI_ERR_IO,
 	GEMINI_ERR_PROTOCOL,
@@ -52,17 +49,16 @@ enum gemini_result {
 // Requests the specified URL via the gemini protocol. If options is non-NULL,
 // it may specify some additional configuration to adjust client behavior.
 //
-// Returns a value indicating the success of the request. If GEMINI_OK is
-// returned, the response details shall be written to the gemini_response
-// argument.
+// Returns a value indicating the success of the request.
+//
+// Caller must call gemini_response_finish afterwards to clean up resources
+// before exiting or re-using it for another request.
 enum gemini_result gemini_request(const char *url,
 		struct gemini_options *options,
 		struct gemini_response *resp);
 
 // Must be called after gemini_request in order to free up the resources
-// allocated during the request. If you intend to re-use the SSL_CTX provided by
-// gemini_options, set the ctx pointer to NULL before calling
-// gemini_response_finish.
+// allocated during the request.
 void gemini_response_finish(struct gemini_response *resp);
 
 // Returns a user-friendly string describing an error.
