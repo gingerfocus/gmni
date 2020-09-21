@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <ctype.h>
 #include <getopt.h>
+#include <libgen.h>
 #include <limits.h>
 #include <openssl/bio.h>
 #include <openssl/err.h>
@@ -127,8 +128,14 @@ save_bookmark(struct browser *browser)
 	const char *path_fmt = get_data_pathfmt();
 	static char path[PATH_MAX+1];
 	snprintf(path, sizeof(path), path_fmt, "bookmarks.gmi");
-	mkdirs(path, 0755);
+	if (mkdirs(dirname(path), 0755) != 0) {
+		snprintf(path, sizeof(path), path_fmt, "bookmarks.gmi");
+		fprintf(stderr, "Error creating directory %s: %s\n",
+				dirname(path), strerror(errno));
+		return;
+	}
 
+	snprintf(path, sizeof(path), path_fmt, "bookmarks.gmi");
 	FILE *f = fopen(path, "a");
 	if (!f) {
 		fprintf(stderr, "Error opening %s for writing: %s\n",
