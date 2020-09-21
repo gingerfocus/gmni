@@ -278,8 +278,10 @@ display_gemini(struct browser *browser, struct gemini_response *resp)
 		if (browser->pagination && row >= ws.ws_row - 4) {
 			char prompt[4096];
 			snprintf(prompt, sizeof(prompt), "\n%s at %s\n"
-				"[Enter]: read more; [N]: follow Nth link; [b]ack; [f]orward; [q]uit\n"
-				"(more) => ", resp->meta, browser->plain_url);
+				"[Enter]: read more; [N]: follow Nth link; %s%s[q]uit\n"
+				"(more) => ", resp->meta, browser->plain_url,
+				browser->history->prev ? "[b]ack; " : "",
+				browser->history->next ? "[f]orward; " : "");
 			enum prompt_result result = PROMPT_AGAIN;
 			while (result == PROMPT_AGAIN) {
 				result = do_prompts(prompt, browser);
@@ -485,10 +487,12 @@ main(int argc, char *argv[])
 		}
 
 		snprintf(prompt, sizeof(prompt), "\n%s at %s\n"
-			"[N]: follow Nth link; [b]ack; [f]orward; [q]uit\n"
+			"[N]: follow Nth link; %s%s[q]uit\n"
 			"=> ",
 			resp.status == GEMINI_STATUS_SUCCESS ? resp.meta : "",
-			browser.plain_url);
+			browser.plain_url,
+			browser.history->prev ? "[b]ack; " : "",
+			browser.history->next ? "[f]orward; " : "");
 		gemini_response_finish(&resp);
 
 		enum prompt_result result = PROMPT_AGAIN;
