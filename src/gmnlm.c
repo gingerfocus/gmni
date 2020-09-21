@@ -322,12 +322,9 @@ repeat:
 			}
 			break;
 		case GEMINI_QUOTE:
+			col += fprintf(out, ">  ");
 			if (text == NULL) {
-				col += fprintf(out, " %s ",
-					browser->unicode ? "|" : "|");
 				text = trim_ws(tok.quote_text);
-			} else {
-				col += fprintf(out, "   ");
 			}
 			break;
 		}
