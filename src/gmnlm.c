@@ -139,10 +139,7 @@ do_prompts(const char *prompt, struct browser *browser)
 static char *
 trim_ws(char *in)
 {
-	for (int i = strlen(in) - 1; in[i] && isspace(in[i]); --i) {
-		in[i] = 0;
-	}
-	for (; *in && isspace(*in); ++in);
+	while (*in && isspace(*in)) ++in;
 	return in;
 }
 
@@ -203,61 +200,80 @@ display_gemini(struct browser *browser, struct gemini_response *resp)
 	while (text != NULL || gemini_parser_next(&p, &tok) == 0) {
 		switch (tok.token) {
 		case GEMINI_TEXT:
-			// TODO: Run other stuff through wrap()
+			col += fprintf(browser->tty, "   ");
 			if (text == NULL) {
 				text = tok.text;
 			}
-
-			do {
-				col += fprintf(browser->tty, "   ");
-				int w = wrap(browser->tty, text, &ws, &row, &col);
-				text += w;
-				if (row >= ws.ws_row - 4) {
-					break;
-				}
-			} while (text[0]);
-
-			if (!text[0]) {
-				text = NULL;
-			}
 			break;
 		case GEMINI_LINK:
-			col += fprintf(browser->tty, "%d) %s\n", nlinks++,
-				trim_ws(tok.link.text ? tok.link.text : tok.link.url));
-			*next = calloc(1, sizeof(struct link));
-			(*next)->url = strdup(trim_ws(tok.link.url));
-			next = &(*next)->next;
+			if (text == NULL) {
+				col += fprintf(browser->tty, "%d) ", nlinks++);
+				text = trim_ws(tok.link.text ? tok.link.text : tok.link.url);
+				*next = calloc(1, sizeof(struct link));
+				(*next)->url = strdup(trim_ws(tok.link.url));
+				next = &(*next)->next;
+			} else {
+				col += fprintf(browser->tty, "   ");
+			}
 			break;
 		case GEMINI_PREFORMATTED:
 			continue; // TODO
 		case GEMINI_HEADING:
-			for (int n = tok.heading.level; n; --n) {
-				col += fprintf(browser->tty, "#");
+			if (text == NULL) {
+				for (int n = tok.heading.level; n; --n) {
+					col += fprintf(browser->tty, "#");
+				}
+				switch (tok.heading.level) {
+				case 1:
+					col += fprintf(browser->tty, "  ");
+					break;
+				case 2:
+				case 3:
+					col += fprintf(browser->tty, " ");
+					break;
+				}
+				text = trim_ws(tok.heading.title);
+			} else {
+				col += fprintf(browser->tty, "   ");
 			}
-			for (int n = 3 - tok.heading.level; n > 1; --n) {
-				col += fprintf(browser->tty, " ");
-			}
-			col += fprintf(browser->tty, " %s\n",
-					trim_ws(tok.heading.title));
 			break;
 		case GEMINI_LIST_ITEM:
-			col += fprintf(browser->tty, " %s %s\n",
-					browser->unicode ? "•" : "*",
-					trim_ws(tok.list_item));
+			if (text == NULL) {
+				col += fprintf(browser->tty, " %s ",
+					browser->unicode ? "•" : "*");
+				text = trim_ws(tok.list_item);
+			} else {
+				col += fprintf(browser->tty, "   ");
+			}
 			break;
 		case GEMINI_QUOTE:
-			col += fprintf(browser->tty, " %s %s\n",
-					browser->unicode ? "|" : "|",
-					trim_ws(tok.quote_text));
+			if (text == NULL) {
+				col += fprintf(browser->tty, " %s ",
+					browser->unicode ? "|" : "|");
+				text = trim_ws(tok.quote_text);
+			} else {
+				col += fprintf(browser->tty, "   ");
+			}
 			break;
+		}
+
+		if (text) {
+			int w = wrap(browser->tty, text, &ws, &row, &col);
+			text += w;
+			if (text[0] && row < ws.ws_row - 4) {
+				continue;
+			}
+
+			if (!text[0]) {
+				text = NULL;
+			}
 		}
 
 		while (col >= ws.ws_col) {
 			col -= ws.ws_col;
 			++row;
 		}
-		++row;
-		col = 0;
+		++row; col = 0;
 
 		if (browser->pagination && row >= ws.ws_row - 4) {
 			char prompt[4096];
