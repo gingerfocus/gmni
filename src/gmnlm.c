@@ -164,7 +164,7 @@ do_prompts(const char *prompt, struct browser *browser)
 	struct link *link = browser->links;
 	char *endptr;
 	int linksel = (int)strtol(in, &endptr, 10);
-	if (endptr[0] == '\n' && linksel >= 0) {
+	if (!endptr[0] && linksel >= 0) {
 		while (linksel > 0 && link) {
 			link = link->next;
 			--linksel;
