@@ -58,7 +58,6 @@ gemini_parser_next(struct gemini_parser *p, struct gemini_token *tok)
 		*end = 0;
 	}
 
-	// TODO: Provide whitespace trimming helper function
 	if (strncmp(p->buf, "=>", 2) == 0) {
 		tok->token = GEMINI_LINK;
 		int i = 2;
