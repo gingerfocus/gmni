@@ -59,7 +59,7 @@ gemini_connect(struct Curl_URL *uri, struct gemini_options *options,
 	struct addrinfo *addr;
 	enum gemini_result res = gemini_get_addrinfo(uri, options, resp, &addr);
 	if (res != GEMINI_OK) {
-		goto cleanup;
+		return res;
 	}
 
 	struct addrinfo *rp;
@@ -79,7 +79,6 @@ gemini_connect(struct Curl_URL *uri, struct gemini_options *options,
 		return res;
 	}
 
-cleanup:
 	if (!options || !options->addr) {
 		freeaddrinfo(addr);
 	}
