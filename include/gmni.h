@@ -2,6 +2,7 @@
 #define GEMINI_CLIENT_H
 #include <netdb.h>
 #include <openssl/ssl.h>
+#include <stdbool.h>
 #include <sys/socket.h>
 
 enum gemini_result {
@@ -106,7 +107,9 @@ enum gemini_status_class gemini_response_class(enum gemini_status status);
 enum gemini_tok {
 	GEMINI_TEXT,
 	GEMINI_LINK,
-	GEMINI_PREFORMATTED,
+	GEMINI_PREFORMATTED_BEGIN,
+	GEMINI_PREFORMATTED_END,
+	GEMINI_PREFORMATTED_TEXT,
 	GEMINI_HEADING,
 	GEMINI_LIST_ITEM,
 	GEMINI_QUOTE,
@@ -124,10 +127,7 @@ struct gemini_token {
 			char *url; // May be NULL
 		} link;
 
-		struct {
-			char *text;
-			char *alt_text; // May be NULL
-		} preformatted;
+		char *preformatted;
 
 		struct {
 			char *title;
@@ -144,6 +144,7 @@ struct gemini_parser {
 	char *buf;
 	size_t bufsz;
 	size_t bufln;
+	bool preformatted;
 };
 
 // Initializes a text/gemini parser which reads from the specified BIO.

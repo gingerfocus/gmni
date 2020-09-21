@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <ctype.h>
 #include <openssl/bio.h>
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
@@ -15,6 +16,7 @@ gemini_parser_init(struct gemini_parser *p, BIO *f)
 	p->buf = malloc(p->bufsz + 1);
 	p->buf[0] = 0;
 	BIO_up_ref(p->f);
+	p->preformatted = false;
 }
 
 void
@@ -57,7 +59,15 @@ gemini_parser_next(struct gemini_parser *p, struct gemini_token *tok)
 		*end = 0;
 	}
 
-	if (strncmp(p->buf, "=>", 2) == 0) {
+	if (p->preformatted) {
+		if (strncmp(p->buf, "```", 3) == 0) {
+			tok->token = GEMINI_PREFORMATTED_END;
+			p->preformatted = false;
+		} else {
+			tok->token = GEMINI_PREFORMATTED_TEXT;
+			tok->preformatted = strdup(p->buf);
+		}
+	} else if (strncmp(p->buf, "=>", 2) == 0) {
 		tok->token = GEMINI_LINK;
 		int i = 2;
 		while (p->buf[i] && isspace(p->buf[i])) ++i;
@@ -76,9 +86,11 @@ gemini_parser_next(struct gemini_parser *p, struct gemini_token *tok)
 
 		tok->link.url = strdup(tok->link.url);
 	} else if (strncmp(p->buf, "```", 3) == 0) {
-		tok->token = GEMINI_PREFORMATTED; // TODO
-		tok->preformatted.text = strdup("<text>");
-		tok->preformatted.alt_text = strdup("<alt-text>");
+		tok->token = GEMINI_PREFORMATTED_BEGIN;
+		if (p->buf[3]) {
+			tok->preformatted = strdup(&p->buf[3]);
+		}
+		p->preformatted = true;
 	} else if (p->buf[0] == '#') {
 		tok->token = GEMINI_HEADING;
 		int level = 1;
@@ -125,9 +137,14 @@ gemini_token_finish(struct gemini_token *tok)
 		free(tok->link.text);
 		free(tok->link.url);
 		break;
-	case GEMINI_PREFORMATTED:
-		free(tok->preformatted.text);
-		free(tok->preformatted.alt_text);
+	case GEMINI_PREFORMATTED_BEGIN:
+		free(tok->preformatted);
+		break;
+	case GEMINI_PREFORMATTED_TEXT:
+		free(tok->preformatted);
+		break;
+	case GEMINI_PREFORMATTED_END:
+		// Nothing to free
 		break;
 	case GEMINI_HEADING:
 		free(tok->heading.title);

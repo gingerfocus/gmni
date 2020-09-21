@@ -278,8 +278,15 @@ repeat:
 				col += fprintf(out, "   ");
 			}
 			break;
-		case GEMINI_PREFORMATTED:
-			continue; // TODO
+		case GEMINI_PREFORMATTED_BEGIN:
+		case GEMINI_PREFORMATTED_END:
+			continue; // Not used
+		case GEMINI_PREFORMATTED_TEXT:
+			col += fprintf(out, "`  ");
+			if (text == NULL) {
+				text = tok.text;
+			}
+			break;
 		case GEMINI_HEADING:
 			if (text == NULL) {
 				for (int n = tok.heading.level; n; --n) {
