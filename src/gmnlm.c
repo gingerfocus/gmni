@@ -154,8 +154,6 @@ wrap(FILE *f, char *s, struct winsize *ws, int *row, int *col)
 		return 0;
 	}
 	for (int i = 0; s[i]; ++i) {
-		// TODO: Other control sequences, and eat ANSI escapes before
-		// they become a problem
 		switch (s[i]) {
 		case '\n':
 			assert(0); // Not supposed to happen
@@ -163,6 +161,9 @@ wrap(FILE *f, char *s, struct winsize *ws, int *row, int *col)
 			*col = *col + (8 - *col % 8);
 			break;
 		default:
+			if (iscntrl(s[i])) {
+				s[i] = '.';
+			}
 			*col += 1;
 			break;
 		}
@@ -188,7 +189,6 @@ wrap(FILE *f, char *s, struct winsize *ws, int *row, int *col)
 static bool
 display_gemini(struct browser *browser, struct gemini_response *resp)
 {
-	// TODO: Strip ANSI escape sequences
 	int nlinks = 0;
 	struct gemini_parser p;
 	gemini_parser_init(&p, resp->bio);
@@ -203,6 +203,7 @@ display_gemini(struct browser *browser, struct gemini_response *resp)
 	while (text != NULL || gemini_parser_next(&p, &tok) == 0) {
 		switch (tok.token) {
 		case GEMINI_TEXT:
+			// TODO: Run other stuff through wrap()
 			if (text == NULL) {
 				text = tok.text;
 			}
