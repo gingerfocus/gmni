@@ -168,7 +168,7 @@ display_gemini(struct browser *browser, struct gemini_response *resp)
 					trim_ws(tok.text));
 			break;
 		case GEMINI_LINK:
-			col += fprintf(browser->tty, "[%d] %s\n", nlinks++,
+			col += fprintf(browser->tty, "%d) %s\n", nlinks++,
 				trim_ws(tok.link.text ? tok.link.text : tok.link.url));
 			*next = calloc(1, sizeof(struct link));
 			(*next)->url = strdup(trim_ws(tok.link.url));
@@ -205,7 +205,7 @@ display_gemini(struct browser *browser, struct gemini_response *resp)
 		if (browser->pagination && row >= ws.ws_row - 4) {
 			char prompt[4096];
 			snprintf(prompt, sizeof(prompt), "\n%s at %s\n"
-				"[Enter]: read more; [n]: follow Nth link; [b]ack; [f]orward; [q]uit\n"
+				"[Enter]: read more; [N]: follow Nth link; [b]ack; [f]orward; [q]uit\n"
 				"(more) => ", resp->meta, browser->plain_url);
 			enum prompt_result result = PROMPT_AGAIN;
 			while (result == PROMPT_AGAIN) {
@@ -412,7 +412,7 @@ main(int argc, char *argv[])
 		}
 
 		snprintf(prompt, sizeof(prompt), "\n%s at %s\n"
-			"[n]: follow Nth link; [b]ack; [f]orward; [q]uit\n"
+			"[N]: follow Nth link; [b]ack; [f]orward; [q]uit\n"
 			"=> ",
 			resp.status == GEMINI_STATUS_SUCCESS ? resp.meta : "",
 			browser.plain_url);
