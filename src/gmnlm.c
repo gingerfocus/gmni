@@ -82,6 +82,7 @@ set_url(struct browser *browser, char *new_url, struct history **history)
 		fprintf(stderr, "Error: invalid URL\n");
 		return false;
 	}
+	curl_url_get(browser->url, CURLUPART_URL, &browser->plain_url, 0);
 	if (history) {
 		struct history *next = calloc(1, sizeof(struct history));
 		curl_url_get(browser->url, CURLUPART_URL, &next->url, 0);
@@ -118,19 +119,23 @@ do_prompts(const char *prompt, struct browser *browser)
 		result = PROMPT_MORE;
 		goto exit;
 	case 'q':
+		if (in[1]) break;
 		result = PROMPT_QUIT;
 		goto exit;
 	case 'b':
+		if (in[1]) break;
 		if (!browser->history->prev) {
 			fprintf(stderr, "At beginning of history\n");
 			result = PROMPT_AGAIN;
 			goto exit;
 		}
+		if (in[1]) break;
 		browser->history = browser->history->prev;
 		set_url(browser, browser->history->url, NULL);
 		result = PROMPT_ANSWERED;
 		goto exit;
 	case 'f':
+		if (in[1]) break;
 		if (!browser->history->next) {
 			fprintf(stderr, "At end of history\n");
 			result = PROMPT_AGAIN;
@@ -141,6 +146,7 @@ do_prompts(const char *prompt, struct browser *browser)
 		result = PROMPT_ANSWERED;
 		goto exit;
 	case '/':
+		if (in[1]) break;
 		if ((r = regcomp(&browser->regex, &in[1], REG_EXTENDED)) != 0) {
 			static char buf[1024];
 			r = regerror(r, &browser->regex, buf, sizeof(buf));
@@ -153,6 +159,7 @@ do_prompts(const char *prompt, struct browser *browser)
 		}
 		goto exit_re;
 	case 'n':
+		if (in[1]) break;
 		if (browser->searching) {
 			result = PROMPT_NEXT;
 			goto exit_re;
@@ -162,6 +169,7 @@ do_prompts(const char *prompt, struct browser *browser)
 			goto exit;
 		}
 	case '?':
+		if (in[1]) break;
 		fprintf(browser->tty, "%s", help_msg);
 		result = PROMPT_AGAIN;
 		goto exit;
@@ -465,6 +473,17 @@ get_input(const struct gemini_response *resp, FILE *source)
 	return input;
 }
 
+static bool
+has_suffix(char *str, char *suff)
+{
+	size_t suffl = strlen(suff);
+	size_t strl = strlen(str);
+	if (strl < suffl) {
+		return false;
+	}
+	return strcmp(&str[strl - suffl], suff) == 0;
+}
+
 // Returns true to skip prompting
 static bool
 do_requests(struct browser *browser, struct gemini_response *resp)
@@ -472,9 +491,40 @@ do_requests(struct browser *browser, struct gemini_response *resp)
 	int nredir = 0;
 	bool requesting = true;
 	while (requesting) {
+		char *scheme;
 		CURLUcode uc = curl_url_get(browser->url,
-				CURLUPART_URL, &browser->plain_url, 0);
+			CURLUPART_SCHEME, &scheme, 0);
 		assert(uc == CURLUE_OK); // Invariant
+		if (strcmp(scheme, "file") == 0) {
+			requesting = false;
+
+			char *path;
+			uc = curl_url_get(browser->url,
+				CURLUPART_PATH, &path, 0);
+			if (uc != CURLUE_OK) {
+				resp->status = GEMINI_STATUS_BAD_REQUEST;
+				break;
+			}
+
+			FILE *fp = fopen(path, "r");
+			if (!fp) {
+				resp->status = GEMINI_STATUS_NOT_FOUND;
+				break;
+			}
+
+			BIO *file = BIO_new_fp(fp, BIO_CLOSE);
+			resp->bio = BIO_new(BIO_f_buffer());
+			BIO_push(resp->bio, file);
+			if (has_suffix(path, ".gmi") || has_suffix(path, ".gemini")) {
+				resp->meta = strdup("text/gemini");
+			} else if (has_suffix(path, ".txt")) {
+				resp->meta = strdup("text/plain");
+			} else {
+				resp->meta = strdup("application/x-octet-stream");
+			}
+			resp->status = GEMINI_STATUS_SUCCESS;
+			return display_response(browser, resp);
+		}
 
 		enum gemini_result res = gemini_request(browser->plain_url,
 				&browser->opts, resp);
