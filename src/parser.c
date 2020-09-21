@@ -52,7 +52,6 @@ gemini_parser_next(struct gemini_parser *p, struct gemini_token *tok)
 		p->buf[p->bufln] = 0;
 	}
 
-	// TODO: Collapse multi-line text for the user-agent to wrap
 	char *end;
 	if ((end = strstr(p->buf, "\n")) != NULL) {
 		*end = 0;
