@@ -13,6 +13,7 @@
 #include <termios.h>
 #include <unistd.h>
 #include "gmni.h"
+#include "tofu.h"
 
 static void
 usage(const char *argv_0)
@@ -57,6 +58,55 @@ get_input(const struct gemini_response *resp, FILE *source)
 	return input;
 }
 
+struct tofu_config {
+	struct gemini_tofu tofu;
+	enum tofu_action action;
+};
+
+static enum tofu_action
+tofu_callback(enum tofu_error error, const char *fingerprint,
+	struct known_host *host, void *data)
+{
+	struct tofu_config *cfg = (struct tofu_config *)data;
+	enum tofu_action action = cfg->action;
+	switch (error) {
+	case TOFU_VALID:
+		assert(0); // Invariant
+	case TOFU_INVALID_CERT:
+		fprintf(stderr,
+			"The server presented an invalid certificate with fingerprint %s.\n",
+			fingerprint);
+		if (action == TOFU_TRUST_ALWAYS) {
+			action = TOFU_TRUST_ONCE;
+		}
+		break;
+	case TOFU_UNTRUSTED_CERT:
+		fprintf(stderr,
+			"The certificate offered by this server is of unknown trust. "
+			"Its fingerprint is: \n"
+			"%s\n\n", fingerprint);
+		break;
+	case TOFU_FINGERPRINT_MISMATCH:
+		fprintf(stderr,
+			"The certificate offered by this server DOES NOT MATCH the one we have on file.\n"
+			"/!\\ Someone may be eavesdropping on or manipulating this connection. /!\\\n"
+			"The unknown certificate's fingerprint is:\n"
+			"%s\n\n"
+			"The expected fingerprint is:\n"
+			"%s\n\n"
+			"If you're certain that this is correct, edit %s:%d\n",
+			fingerprint, host->fingerprint,
+			cfg->tofu.known_hosts_path, host->lineno);
+		return TOFU_FAIL;
+	}
+
+	if (action == TOFU_ASK) {
+		return TOFU_FAIL;
+	}
+
+	return action;
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -71,7 +121,6 @@ main(int argc, char *argv[])
 		INPUT_READ,
 		INPUT_SUPPRESS,
 	};
-
 	enum input_mode input_mode = INPUT_READ;
 	FILE *input_source = stdin;
 
@@ -82,9 +131,11 @@ main(int argc, char *argv[])
 	struct gemini_options opts = {
 		.hints = &hints,
 	};
+	struct tofu_config cfg;
+	cfg.action = TOFU_ASK;
 
 	int c;
-	while ((c = getopt(argc, argv, "46d:D:E:hlLiINR:")) != -1) {
+	while ((c = getopt(argc, argv, "46d:D:E:hj:lLiINR:")) != -1) {
 		switch (c) {
 		case '4':
 			hints.ai_family = AF_INET;
@@ -115,6 +166,18 @@ main(int argc, char *argv[])
 		case 'h':
 			usage(argv[0]);
 			return 0;
+		case 'j':
+			if (strcmp(optarg, "fail") == 0) {
+				cfg.action = TOFU_FAIL;
+			} else if (strcmp(optarg, "once") == 0) {
+				cfg.action = TOFU_TRUST_ONCE;
+			} else if (strcmp(optarg, "always") == 0) {
+				cfg.action = TOFU_TRUST_ALWAYS;
+			} else {
+				usage(argv[0]);
+				return 1;
+			}
+			break;
 		case 'l':
 			linefeed = false;
 			break;
@@ -153,6 +216,8 @@ main(int argc, char *argv[])
 
 	SSL_load_error_strings();
 	ERR_load_crypto_strings();
+	opts.ssl_ctx = SSL_CTX_new(TLS_method());
+	gemini_tofu_init(&cfg.tofu, opts.ssl_ctx, &tofu_callback, &cfg);
 
 	bool exit = false;
 	char *url = strdup(argv[optind]);

@@ -7,7 +7,9 @@ gmni() {
 		src/client.c \
 		src/escape.c \
 		src/gmni.c \
-		src/url.c
+		src/tofu.c \
+		src/url.c \
+		src/util.c
 }
 
 gmnlm() {
@@ -16,6 +18,7 @@ gmnlm() {
 		src/escape.c \
 		src/gmnlm.c \
 		src/parser.c \
+		src/tofu.c \
 		src/url.c \
 		src/util.c
 }

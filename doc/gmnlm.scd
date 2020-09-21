@@ -6,13 +6,18 @@ gmnlm - Gemini line-mode browser
 
 # SYNPOSIS
 
-*gmnlm* [-PU] _gemini://..._
+*gmnlm* [-PU] [-j _mode_] _gemini://..._
 
 # DESCRIPTION
 
 *gmnlm* is an interactive line-mode Gemini browser.
 
 # OPTIONS
+
+*-j* _mode_
+	Sets the TOFU (trust on first use) configuration, which controls if the
+	client shall trust new certificates. _mode_ can be one of *always*,
+	*once*, or *fail*.
 
 *-P*
 	Disable pagination.

@@ -13,6 +13,7 @@
 #include <termios.h>
 #include <unistd.h>
 #include "gmni.h"
+#include "tofu.h"
 #include "url.h"
 #include "util.h"
 
@@ -29,6 +30,8 @@ struct history {
 struct browser {
 	bool pagination, unicode;
 	struct gemini_options opts;
+	struct gemini_tofu tofu;
+	enum tofu_action tofu_mode;
 
 	FILE *tty;
 	char *plain_url;
@@ -657,22 +660,113 @@ do_requests(struct browser *browser, struct gemini_response *resp)
 	return false;
 }
 
+static enum tofu_action
+tofu_callback(enum tofu_error error, const char *fingerprint,
+	struct known_host *host, void *data)
+{
+	struct browser *browser = data;
+	if (browser->tofu_mode != TOFU_ASK) {
+		return browser->tofu_mode;
+	}
+
+	static char prompt[8192];
+	switch (error) {
+	case TOFU_VALID:
+		assert(0); // Invariant
+	case TOFU_INVALID_CERT:
+		snprintf(prompt, sizeof(prompt),
+			"The server presented an invalid certificate. If you choose to proceed, "
+			"you should not disclose personal information or trust the contents of the page.\n"
+			"trust [o]nce; [a]bort\n"
+			"=> ");
+		break;
+	case TOFU_UNTRUSTED_CERT:
+		snprintf(prompt, sizeof(prompt),
+			"The certificate offered by this server is of unknown trust. "
+			"Its fingerprint is: \n"
+			"%s\n\n"
+			"If you knew the fingerprint to expect in advance, verify that this matches.\n"
+			"Otherwise, it should be safe to trust this certificate.\n\n"
+			"[t]rust always; trust [o]nce; [a]bort\n"
+			"=> ", fingerprint);
+		break;
+	case TOFU_FINGERPRINT_MISMATCH:
+		snprintf(prompt, sizeof(prompt),
+			"The certificate offered by this server DOES NOT MATCH the one we have on file.\n"
+			"/!\\ Someone may be eavesdropping on or manipulating this connection. /!\\\n"
+			"The unknown certificate's fingerprint is:\n"
+			"%s\n\n"
+			"The expected fingerprint is:\n"
+			"%s\n\n"
+			"If you're certain that this is correct, edit %s:%d\n",
+			fingerprint, host->fingerprint,
+			browser->tofu.known_hosts_path, host->lineno);
+		return TOFU_FAIL;
+	}
+
+	bool prompting = true;
+	while (prompting) {
+		fprintf(browser->tty, "%s", prompt);
+
+		size_t sz = 0;
+		char *line = NULL;
+		if (getline(&line, &sz, browser->tty) == -1) {
+			free(line);
+			return TOFU_FAIL;
+		}
+		if (line[1] != '\n') {
+			free(line);
+			continue;
+		}
+
+		char c = line[0];
+		free(line);
+
+		switch (c) {
+		case 't':
+			if (error == TOFU_INVALID_CERT) {
+				break;
+			}
+			return TOFU_TRUST_ALWAYS;
+		case 'o':
+			return TOFU_TRUST_ONCE;
+		case 'a':
+			return TOFU_FAIL;
+		}
+	}
+
+	return TOFU_FAIL;
+}
+
 int
 main(int argc, char *argv[])
 {
 	struct browser browser = {
 		.pagination = true,
+		.tofu_mode = TOFU_ASK,
 		.unicode = true,
 		.url = curl_url(),
 		.tty = fopen("/dev/tty", "w+"),
 	};
 
 	int c;
-	while ((c = getopt(argc, argv, "hPU")) != -1) {
+	while ((c = getopt(argc, argv, "hj:PU")) != -1) {
 		switch (c) {
 		case 'h':
 			usage(argv[0]);
 			return 0;
+		case 'j':
+			if (strcmp(optarg, "fail") == 0) {
+				browser.tofu_mode = TOFU_FAIL;
+			} else if (strcmp(optarg, "once") == 0) {
+				browser.tofu_mode = TOFU_TRUST_ONCE;
+			} else if (strcmp(optarg, "always") == 0) {
+				browser.tofu_mode = TOFU_TRUST_ALWAYS;
+			} else {
+				usage(argv[0]);
+				return 1;
+			}
+			break;
 		case 'P':
 			browser.pagination = false;
 			break;
@@ -695,6 +789,8 @@ main(int argc, char *argv[])
 	SSL_load_error_strings();
 	ERR_load_crypto_strings();
 	browser.opts.ssl_ctx = SSL_CTX_new(TLS_method());
+	gemini_tofu_init(&browser.tofu, browser.opts.ssl_ctx,
+			&tofu_callback, &browser);
 
 	struct gemini_response resp;
 	browser.running = true;

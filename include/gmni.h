@@ -13,6 +13,7 @@ enum gemini_result {
 	GEMINI_ERR_RESOLVE,
 	GEMINI_ERR_CONNECT,
 	GEMINI_ERR_SSL,
+	GEMINI_ERR_SSL_VERIFY,
 	GEMINI_ERR_IO,
 	GEMINI_ERR_PROTOCOL,
 };
@@ -64,10 +65,6 @@ struct gemini_options {
 	// If NULL, an SSL context will be created. If unset, the ssl field
 	// must also be NULL.
 	SSL_CTX *ssl_ctx;
-
-	// If NULL, an SSL connection will be established. If set, it is
-	// presumed that the caller pre-established the SSL connection.
-	SSL *ssl;
 
 	// If ai_family != AF_UNSPEC (the default value on most systems), the
 	// client will connect to this address and skip name resolution.

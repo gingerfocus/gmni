@@ -95,6 +95,7 @@ gemini_request(const char *url, struct gemini_options *options,
 	assert(url);
 	assert(resp);
 	resp->meta = NULL;
+	resp->bio = NULL;
 	if (strlen(url) > 1024) {
 		return GEMINI_ERR_INVALID_URL;
 	}
@@ -110,7 +111,7 @@ gemini_request(const char *url, struct gemini_options *options,
 		goto cleanup;
 	}
 
-	char *scheme;
+	char *scheme, *host;
 	if (curl_url_get(uri, CURLUPART_SCHEME, &scheme, 0) != CURLUE_OK) {
 		res = GEMINI_ERR_INVALID_URL;
 		goto cleanup;
@@ -120,6 +121,10 @@ gemini_request(const char *url, struct gemini_options *options,
 			goto cleanup;
 		}
 	}
+	if (curl_url_get(uri, CURLUPART_HOST, &host, 0) != CURLUE_OK) {
+		res = GEMINI_ERR_INVALID_URL;
+		goto cleanup;
+	}
 
 	if (options && options->ssl_ctx) {
 		resp->ssl_ctx = options->ssl_ctx;
@@ -127,42 +132,54 @@ gemini_request(const char *url, struct gemini_options *options,
 	} else {
 		resp->ssl_ctx = SSL_CTX_new(TLS_method());
 		assert(resp->ssl_ctx);
+		SSL_CTX_set_verify(resp->ssl_ctx, SSL_VERIFY_PEER, NULL);
 	}
 
+	int r;
 	BIO *sbio = BIO_new(BIO_f_ssl());
-	if (options && options->ssl) {
-		resp->ssl = options->ssl;
-		SSL_up_ref(resp->ssl);
-		BIO_set_ssl(sbio, resp->ssl, 0);
-		resp->fd = -1;
-	} else {
-		res = gemini_connect(uri, options, resp, &resp->fd);
-		if (res != GEMINI_OK) {
-			goto cleanup;
-		}
-
-		resp->ssl = SSL_new(resp->ssl_ctx);
-		assert(resp->ssl);
-		int r = SSL_set_fd(resp->ssl, resp->fd);
-		if (r != 1) {
-			resp->status = r;
-			res = GEMINI_ERR_SSL;
-			goto cleanup;
-		}
-		r = SSL_connect(resp->ssl);
-		if (r != 1) {
-			resp->status = r;
-			res = GEMINI_ERR_SSL;
-			goto cleanup;
-		}
-		BIO_set_ssl(sbio, resp->ssl, 0);
+	res = gemini_connect(uri, options, resp, &resp->fd);
+	if (res != GEMINI_OK) {
+		goto cleanup;
 	}
+
+	resp->ssl = SSL_new(resp->ssl_ctx);
+	assert(resp->ssl);
+	SSL_set_connect_state(resp->ssl);
+	if ((r = SSL_set1_host(resp->ssl, host)) != 1) {
+		goto ssl_error;
+	}
+	if ((r = SSL_set_tlsext_host_name(resp->ssl, host)) != 1) {
+		goto ssl_error;
+	}
+	if ((r = SSL_set_fd(resp->ssl, resp->fd)) != 1) {
+		goto ssl_error;
+	}
+	if ((r = SSL_connect(resp->ssl)) != 1) {
+		goto ssl_error;
+	}
+
+	X509 *cert = SSL_get_peer_certificate(resp->ssl);
+	if (!cert) {
+		resp->status = X509_V_ERR_UNSPECIFIED;
+		res = GEMINI_ERR_SSL_VERIFY;
+		goto cleanup;
+	}
+	X509_free(cert);
+
+	long vr = SSL_get_verify_result(resp->ssl);
+	if (vr != X509_V_OK) {
+		resp->status = vr;
+		res = GEMINI_ERR_SSL_VERIFY;
+		goto cleanup;
+	}
+
+	BIO_set_ssl(sbio, resp->ssl, 0);
 
 	resp->bio = BIO_new(BIO_f_buffer());
 	BIO_push(resp->bio, sbio);
 
 	char req[1024 + 3];
-	int r = snprintf(req, sizeof(req), "%s\r\n", url);
+	r = snprintf(req, sizeof(req), "%s\r\n", url);
 	assert(r > 0);
 
 	r = BIO_puts(sbio, req);
@@ -199,6 +216,10 @@ gemini_request(const char *url, struct gemini_options *options,
 cleanup:
 	curl_url_cleanup(uri);
 	return res;
+ssl_error:
+	res = GEMINI_ERR_SSL;
+	resp->status = r;
+	goto cleanup;
 }
 
 void
@@ -248,6 +269,8 @@ gemini_strerr(enum gemini_result r, struct gemini_response *resp)
 		return ERR_error_string(
 			SSL_get_error(resp->ssl, resp->status),
 			NULL);
+	case GEMINI_ERR_SSL_VERIFY:
+		return X509_verify_cert_error_string(resp->status);
 	case GEMINI_ERR_IO:
 		return "I/O error";
 	case GEMINI_ERR_PROTOCOL:

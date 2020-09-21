@@ -6,7 +6,7 @@ gmni - Gemini client
 
 # SYNPOSIS
 
-*gmni* [-46lLiIN] [-E _path_] [-d _input_] [-D _path_] _gemini://..._
+*gmni* [-46lLiIN] [-j _mode_] [-E _path_] [-d _input_] [-D _path_] _gemini://..._
 
 # DESCRIPTION
 
@@ -51,6 +51,11 @@ performed with the user's input supplied to the server.
 
 *-L*
 	Follow redirects.
+
+*-j* _mode_
+	Sets the TOFU (trust on first use) configuration, which controls if the
+	client shall trust new certificates. _mode_ can be one of *always*,
+	*once*, or *fail*.
 
 *-i*
 	Print the response status and meta text to stdout.
