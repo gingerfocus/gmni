@@ -16,7 +16,8 @@ gmnlm() {
 		src/escape.c \
 		src/gmnlm.c \
 		src/parser.c \
-		src/url.c
+		src/url.c \
+		src/util.c
 }
 
 all="gmni gmnlm"

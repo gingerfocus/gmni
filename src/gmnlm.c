@@ -12,6 +12,7 @@
 #include <unistd.h>
 #include "gmni.h"
 #include "url.h"
+#include "util.h"
 
 struct link {
 	char *url;
@@ -29,6 +30,7 @@ struct browser {
 
 	FILE *tty;
 	char *plain_url;
+	char *page_title;
 	struct Curl_URL *url;
 	struct link *links;
 	struct history *history;
@@ -52,6 +54,8 @@ const char *help_msg =
 	"N\tFollow Nth link (where N is a number)\n"
 	"b\tBack (in the page history)\n"
 	"f\tForward (in the page history)\n"
+	"m\tSave bookmark\n"
+	"M\tBrowse bookmarks\n"
 	"\n"
 	"Other commands include:\n\n"
 	"<Enter>\tread more lines\n"
@@ -98,6 +102,63 @@ set_url(struct browser *browser, char *new_url, struct history **history)
 	return true;
 }
 
+static char *
+get_data_pathfmt()
+{
+	const struct pathspec paths[] = {
+		{.var = "GMNIDATA", .path = "/%s"},
+		{.var = "XDG_DATA_HOME", .path = "/gmni/%s"},
+		{.var = "HOME", .path = "/.local/share/gmni/%s"}
+	};
+	return getpath(paths, sizeof(paths) / sizeof(paths[0]));
+}
+
+static char *
+trim_ws(char *in)
+{
+	while (*in && isspace(*in)) ++in;
+	return in;
+}
+
+static void
+save_bookmark(struct browser *browser)
+{
+	const char *path_fmt = get_data_pathfmt();
+	static char path[PATH_MAX+1];
+	snprintf(path, sizeof(path), path_fmt, "bookmarks.gmi");
+	mkdirs(path, 0755);
+
+	FILE *f = fopen(path, "a");
+	if (!f) {
+		fprintf(stderr, "Error opening %s for writing: %s\n",
+				path, strerror(errno));
+		return;
+	}
+
+	char *title = browser->page_title;
+	if (title) {
+		title = trim_ws(browser->page_title);
+	}
+
+	fprintf(f, "=> %s%s%s\n", browser->plain_url,
+		title ? " " : "", title ? title : "");
+	fclose(f);
+
+	fprintf(browser->tty, "Bookmark saved: %s\n",
+		title ? title : browser->plain_url);
+}
+
+static void
+open_bookmarks(struct browser *browser)
+{
+	const char *path_fmt = get_data_pathfmt();
+	static char path[PATH_MAX+1];
+	snprintf(path, sizeof(path), path_fmt, "bookmarks.gmi");
+	static char url[PATH_MAX+1+7];
+	snprintf(url, sizeof(url), "file://%s", path);
+	set_url(browser, url, &browser->history);
+}
+
 static enum prompt_result
 do_prompts(const char *prompt, struct browser *browser)
 {
@@ -132,6 +193,16 @@ do_prompts(const char *prompt, struct browser *browser)
 		if (in[1]) break;
 		browser->history = browser->history->prev;
 		set_url(browser, browser->history->url, NULL);
+		result = PROMPT_ANSWERED;
+		goto exit;
+	case 'm':
+		if (in[1]) break;
+		save_bookmark(browser);
+		result = PROMPT_AGAIN;
+		goto exit;
+	case 'M':
+		if (in[1]) break;
+		open_bookmarks(browser);
 		result = PROMPT_ANSWERED;
 		goto exit;
 	case 'f':
@@ -205,13 +276,6 @@ exit_re:
 	return result;
 }
 
-static char *
-trim_ws(char *in)
-{
-	while (*in && isspace(*in)) ++in;
-	return in;
-}
-
 static int
 wrap(FILE *f, char *s, struct winsize *ws, int *row, int *col)
 {
@@ -258,6 +322,8 @@ display_gemini(struct browser *browser, struct gemini_response *resp)
 	int nlinks = 0;
 	struct gemini_parser p;
 	gemini_parser_init(&p, resp->bio);
+	free(browser->page_title);
+	browser->page_title = NULL;
 
 	struct winsize ws;
 	ioctl(fileno(browser->tty), TIOCGWINSZ, &ws);
@@ -302,6 +368,9 @@ repeat:
 			}
 			break;
 		case GEMINI_HEADING:
+			if (!browser->page_title) {
+				browser->page_title = strdup(tok.heading.title);
+			}
 			if (text == NULL) {
 				for (int n = tok.heading.level; n; --n) {
 					col += fprintf(out, "#");
