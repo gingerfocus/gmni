@@ -180,6 +180,9 @@ display_gemini(struct browser *browser, struct gemini_response *resp)
 			for (int n = tok.heading.level; n; --n) {
 				col += fprintf(browser->tty, "#");
 			}
+			for (int n = 3 - tok.heading.level; n > 1; --n) {
+				col += fprintf(browser->tty, " ");
+			}
 			col += fprintf(browser->tty, " %s\n",
 					trim_ws(tok.heading.title));
 			break;
