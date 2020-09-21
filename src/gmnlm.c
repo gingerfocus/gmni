@@ -41,6 +41,14 @@ enum prompt_result {
 	PROMPT_ANSWERED,
 };
 
+const char *help_msg =
+	"The following commands are available:\n\n"
+	"q: Quit\n"
+	"N: Follow Nth link (where N is a number)\n"
+	"b: Back (in the page history)\n"
+	"f: Forward (in the page history)\n"
+	;
+
 static void
 usage(const char *argv_0)
 {
@@ -98,6 +106,11 @@ do_prompts(const char *prompt, struct browser *browser)
 	}
 	if (strcmp(in, "q\n") == 0) {
 		result = PROMPT_QUIT;
+		goto exit;
+	}
+	if (strcmp(in, "?\n") == 0) {
+		fprintf(browser->tty, "%s", help_msg);
+		result = PROMPT_AGAIN;
 		goto exit;
 	}
 	if (strcmp(in, "b\n") == 0) {
@@ -291,7 +304,7 @@ display_gemini(struct browser *browser, struct gemini_response *resp)
 		if (browser->pagination && row >= ws.ws_row - 4) {
 			char prompt[4096];
 			snprintf(prompt, sizeof(prompt), "\n%s at %s\n"
-				"[Enter]: read more; [N]: follow Nth link; %s%s[q]uit; or type a URL\n"
+				"[Enter]: read more; [N]: follow Nth link; %s%s[q]uit; [?]; or type a URL\n"
 				"(more) => ", resp->meta, browser->plain_url,
 				browser->history->prev ? "[b]ack; " : "",
 				browser->history->next ? "[f]orward; " : "");
@@ -500,7 +513,7 @@ main(int argc, char *argv[])
 		}
 
 		snprintf(prompt, sizeof(prompt), "\n%s at %s\n"
-			"[N]: follow Nth link; %s%s[q]uit; or type a URL\n"
+			"[N]: follow Nth link; %s%s[q]uit; [?]; or type a URL\n"
 			"=> ",
 			resp.status == GEMINI_STATUS_SUCCESS ? resp.meta : "",
 			browser.plain_url,
