@@ -5,13 +5,19 @@ This is a [Gemini](https://gemini.circumlunar.space/) client. Included are:
 - A CLI utility (like curl): gmni
 - A [line-mode browser](https://en.wikipedia.org/wiki/Line_Mode_Browser): gmnlm
 
-[![Screenshot of the line-mode browser](https://l.sr.ht/7kaA.png)](https://asciinema.org/a/Y7viodM01e0AXYyf40CwSLAVA)
-
 Dependencies:
 
 - A POSIX-like system and a C11 compiler
 - OpenSSL
 - [scdoc](https://sr.ht/~sircmpwn/scdoc/) (optional)
+
+Features:
+
+- Page history
+- Regex searches
+- Bookmarks
+
+[![Screenshot of the line-mode browser](https://l.sr.ht/7kaA.png)](https://asciinema.org/a/Y7viodM01e0AXYyf40CwSLAVA)
 
 ## Compiling
 
