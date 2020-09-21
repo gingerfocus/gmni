@@ -3,6 +3,7 @@
 #include <getopt.h>
 #include <openssl/bio.h>
 #include <openssl/err.h>
+#include <regex.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
@@ -32,6 +33,9 @@ struct browser {
 	struct link *links;
 	struct history *history;
 	bool running;
+
+	bool searching;
+	regex_t regex;
 };
 
 enum prompt_result {
@@ -39,14 +43,20 @@ enum prompt_result {
 	PROMPT_MORE,
 	PROMPT_QUIT,
 	PROMPT_ANSWERED,
+	PROMPT_NEXT,
 };
 
 const char *help_msg =
 	"The following commands are available:\n\n"
-	"q: Quit\n"
-	"N: Follow Nth link (where N is a number)\n"
-	"b: Back (in the page history)\n"
-	"f: Forward (in the page history)\n"
+	"q\tQuit\n"
+	"N\tFollow Nth link (where N is a number)\n"
+	"b\tBack (in the page history)\n"
+	"f\tForward (in the page history)\n"
+	"\n"
+	"Other commands include:\n\n"
+	"<Enter>\tread more lines\n"
+	"<url>\tgo to url\n"
+	"/<text>\tsearch for text (POSIX regular expression)\n"
 	;
 
 static void
@@ -100,20 +110,17 @@ do_prompts(const char *prompt, struct browser *browser)
 		result = PROMPT_QUIT;
 		goto exit;
 	}
-	if (strcmp(in, "\n") == 0) {
+	in[n - 1] = 0; // Remove LF
+
+	int r;
+	switch (in[0]) {
+	case '\0':
 		result = PROMPT_MORE;
 		goto exit;
-	}
-	if (strcmp(in, "q\n") == 0) {
+	case 'q':
 		result = PROMPT_QUIT;
 		goto exit;
-	}
-	if (strcmp(in, "?\n") == 0) {
-		fprintf(browser->tty, "%s", help_msg);
-		result = PROMPT_AGAIN;
-		goto exit;
-	}
-	if (strcmp(in, "b\n") == 0) {
+	case 'b':
 		if (!browser->history->prev) {
 			fprintf(stderr, "At beginning of history\n");
 			result = PROMPT_AGAIN;
@@ -123,8 +130,7 @@ do_prompts(const char *prompt, struct browser *browser)
 		set_url(browser, browser->history->url, NULL);
 		result = PROMPT_ANSWERED;
 		goto exit;
-	}
-	if (strcmp(in, "f\n") == 0) {
+	case 'f':
 		if (!browser->history->next) {
 			fprintf(stderr, "At end of history\n");
 			result = PROMPT_AGAIN;
@@ -133,6 +139,25 @@ do_prompts(const char *prompt, struct browser *browser)
 		browser->history = browser->history->next;
 		set_url(browser, browser->history->url, NULL);
 		result = PROMPT_ANSWERED;
+		goto exit;
+	case '/':
+		if ((r = regcomp(&browser->regex, &in[1], REG_EXTENDED)) != 0) {
+			static char buf[1024];
+			r = regerror(r, &browser->regex, buf, sizeof(buf));
+			assert(r < (int)sizeof(buf));
+			fprintf(stderr, "Error: %s\n", buf);
+			result = PROMPT_AGAIN;
+		} else {
+			browser->searching = true;
+			result = PROMPT_ANSWERED;
+		}
+		goto exit_re;
+	case 'n':
+		result = PROMPT_NEXT;
+		goto exit_re;
+	case '?':
+		fprintf(browser->tty, "%s", help_msg);
+		result = PROMPT_AGAIN;
 		goto exit;
 	}
 
@@ -154,10 +179,14 @@ do_prompts(const char *prompt, struct browser *browser)
 		}
 	}
 
-	in[n - 1] = 0; // Remove LF
 	set_url(browser, in, &browser->history);
 	result = PROMPT_ANSWERED;
 exit:
+	if (browser->searching) {
+		browser->searching = false;
+		regfree(&browser->regex);
+	}
+exit_re:
 	free(in);
 	return result;
 }
@@ -219,27 +248,34 @@ display_gemini(struct browser *browser, struct gemini_response *resp)
 	struct winsize ws;
 	ioctl(fileno(browser->tty), TIOCGWINSZ, &ws);
 
+	FILE *out = browser->tty;
+	bool searching = browser->searching;
+	if (searching) {
+		out = fopen("/dev/null", "w+");
+	}
+
 	char *text = NULL;
 	int row = 0, col = 0;
 	struct gemini_token tok;
 	struct link **next = &browser->links;
 	while (text != NULL || gemini_parser_next(&p, &tok) == 0) {
+repeat:
 		switch (tok.token) {
 		case GEMINI_TEXT:
-			col += fprintf(browser->tty, "   ");
+			col += fprintf(out, "   ");
 			if (text == NULL) {
 				text = tok.text;
 			}
 			break;
 		case GEMINI_LINK:
 			if (text == NULL) {
-				col += fprintf(browser->tty, "%d) ", nlinks++);
+				col += fprintf(out, "%d) ", nlinks++);
 				text = trim_ws(tok.link.text ? tok.link.text : tok.link.url);
 				*next = calloc(1, sizeof(struct link));
 				(*next)->url = strdup(trim_ws(tok.link.url));
 				next = &(*next)->next;
 			} else {
-				col += fprintf(browser->tty, "   ");
+				col += fprintf(out, "   ");
 			}
 			break;
 		case GEMINI_PREFORMATTED:
@@ -247,44 +283,59 @@ display_gemini(struct browser *browser, struct gemini_response *resp)
 		case GEMINI_HEADING:
 			if (text == NULL) {
 				for (int n = tok.heading.level; n; --n) {
-					col += fprintf(browser->tty, "#");
+					col += fprintf(out, "#");
 				}
 				switch (tok.heading.level) {
 				case 1:
-					col += fprintf(browser->tty, "  ");
+					col += fprintf(out, "  ");
 					break;
 				case 2:
 				case 3:
-					col += fprintf(browser->tty, " ");
+					col += fprintf(out, " ");
 					break;
 				}
 				text = trim_ws(tok.heading.title);
 			} else {
-				col += fprintf(browser->tty, "   ");
+				col += fprintf(out, "   ");
 			}
 			break;
 		case GEMINI_LIST_ITEM:
 			if (text == NULL) {
-				col += fprintf(browser->tty, " %s ",
+				col += fprintf(out, " %s ",
 					browser->unicode ? "•" : "*");
 				text = trim_ws(tok.list_item);
 			} else {
-				col += fprintf(browser->tty, "   ");
+				col += fprintf(out, "   ");
 			}
 			break;
 		case GEMINI_QUOTE:
 			if (text == NULL) {
-				col += fprintf(browser->tty, " %s ",
+				col += fprintf(out, " %s ",
 					browser->unicode ? "|" : "|");
 				text = trim_ws(tok.quote_text);
 			} else {
-				col += fprintf(browser->tty, "   ");
+				col += fprintf(out, "   ");
 			}
 			break;
 		}
 
+		if (text && searching) {
+			int r = regexec(&browser->regex, text, 0, NULL, 0);
+			if (r != 0) {
+				text = NULL;
+				continue;
+			} else {
+				fclose(out);
+				row = col = 0;
+				out = browser->tty;
+				text = NULL;
+				searching = false;
+				goto repeat;
+			}
+		}
+
 		if (text) {
-			int w = wrap(browser->tty, text, &ws, &row, &col);
+			int w = wrap(out, text, &ws, &row, &col);
 			text += w;
 			if (text[0] && row < ws.ws_row - 4) {
 				continue;
@@ -304,8 +355,9 @@ display_gemini(struct browser *browser, struct gemini_response *resp)
 		if (browser->pagination && row >= ws.ws_row - 4) {
 			char prompt[4096];
 			snprintf(prompt, sizeof(prompt), "\n%s at %s\n"
-				"[Enter]: read more; [N]: follow Nth link; %s%s[q]uit; [?]; or type a URL\n"
+				"[Enter]: read more; %s[N]: follow Nth link; %s%s[q]uit; [?]; or type a URL\n"
 				"(more) => ", resp->meta, browser->plain_url,
+				browser->searching ? "[n]ext result; " : "",
 				browser->history->prev ? "[b]ack; " : "",
 				browser->history->next ? "[f]orward; " : "");
 			enum prompt_result result = PROMPT_AGAIN;
@@ -322,6 +374,10 @@ display_gemini(struct browser *browser, struct gemini_response *resp)
 				return true;
 			case PROMPT_ANSWERED:
 				return true;
+			case PROMPT_NEXT:
+				searching = true;
+				out = fopen("/dev/null", "w");
+				break;
 			}
 
 			row = col = 0;
@@ -533,6 +589,7 @@ main(int argc, char *argv[])
 			browser.running = false;
 			break;
 		case PROMPT_ANSWERED:
+		case PROMPT_NEXT:
 			break;
 		}
 
