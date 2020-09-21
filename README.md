@@ -5,7 +5,7 @@ This is a [Gemini](https://gemini.circumlunar.space/) client. Included are:
 - A CLI utility (like curl): gmni
 - A [line-mode browser](https://en.wikipedia.org/wiki/Line_Mode_Browser): gmnlm
 
-[![Screenshot of the line-mode browser](https://l.sr.ht/7kaA.png)](https://asciinema.org/a/ldo2gV7qiDoBXvGwuD6x1jbn3)
+[![Screenshot of the line-mode browser](https://l.sr.ht/7kaA.png)](https://asciinema.org/a/Y7viodM01e0AXYyf40CwSLAVA)
 
 Dependencies:
 
