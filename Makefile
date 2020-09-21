@@ -13,6 +13,7 @@ gmnlm: $(gmnlm_objects)
 	@$(CC) $(LDFLAGS) $(LIBS) -o $@ $(gmnlm_objects)
 
 doc/gmni.1: doc/gmni.scd
+doc/gmnlm.1: doc/gmnlm.scd
 
 .SUFFIXES: .c .o .scd .1
 
@@ -27,10 +28,10 @@ doc/gmni.1: doc/gmni.scd
 	@printf 'SCDOC\t$@\n'
 	@$(SCDOC) < $< > $@
 
-docs: doc/gmni.1
+docs: doc/gmni.1 doc/gmnlm.1
 
 clean:
-	@rm -f gmni doc/gmni.1
+	@rm -f gmni doc/gmni.1 doc/gmnlm.1
 
 distclean: clean
 	@rm -rf "$(OUTDIR)"
@@ -39,6 +40,8 @@ install: all
 	mkdir -p $(BINDIR)
 	mkdir -p $(MANDIR)/man1
 	install -Dm755 gmni $(BINDIR)/gmni
+	install -Dm755 gmnlm $(BINDIR)/gmnlm
 	install -Dm644 doc/gmni.1 $(MANDIR)/man1/gmni.1
+	install -Dm644 doc/gmnlm.1 $(MANDIR)/man1/gmnlm.1
 
 .PHONY: clean distclean docs install
