@@ -146,6 +146,45 @@ trim_ws(char *in)
 	return in;
 }
 
+static int
+wrap(FILE *f, char *s, struct winsize *ws, int *row, int *col)
+{
+	if (!s[0]) {
+		fprintf(f, "\n");
+		return 0;
+	}
+	for (int i = 0; s[i]; ++i) {
+		// TODO: Other control sequences, and eat ANSI escapes before
+		// they become a problem
+		switch (s[i]) {
+		case '\n':
+			assert(0); // Not supposed to happen
+		case '\t':
+			*col = *col + (8 - *col % 8);
+			break;
+		default:
+			*col += 1;
+			break;
+		}
+
+		if (*col >= ws->ws_col) {
+			int j = i--;
+			while (&s[i] != s && !isspace(s[i])) --i;
+			if (&s[i] == s) {
+				i = j;
+			}
+			char c = s[i];
+			s[i] = 0;
+			int n = fprintf(f, "%s\n", s);
+			s[i] = c;
+			*row += 1;
+			*col = 0;
+			return n;
+		}
+	}
+	return fprintf(f, "%s\n", s) - 1;
+}
+
 static bool
 display_gemini(struct browser *browser, struct gemini_response *resp)
 {
@@ -157,15 +196,29 @@ display_gemini(struct browser *browser, struct gemini_response *resp)
 	struct winsize ws;
 	ioctl(fileno(browser->tty), TIOCGWINSZ, &ws);
 
+	char *text = NULL;
 	int row = 0, col = 0;
 	struct gemini_token tok;
 	struct link **next = &browser->links;
-	while (gemini_parser_next(&p, &tok) == 0) {
+	while (text != NULL || gemini_parser_next(&p, &tok) == 0) {
 		switch (tok.token) {
 		case GEMINI_TEXT:
-			// TODO: word wrap
-			col += fprintf(browser->tty, "   %s\n",
-					trim_ws(tok.text));
+			if (text == NULL) {
+				text = tok.text;
+			}
+
+			do {
+				col += fprintf(browser->tty, "   ");
+				int w = wrap(browser->tty, text, &ws, &row, &col);
+				text += w;
+				if (row >= ws.ws_row - 4) {
+					break;
+				}
+			} while (text[0]);
+
+			if (!text[0]) {
+				text = NULL;
+			}
 			break;
 		case GEMINI_LINK:
 			col += fprintf(browser->tty, "%d) %s\n", nlinks++,
