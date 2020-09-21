@@ -6,11 +6,11 @@ include $(OUTDIR)/cppcache
 
 gmni: $(gmni_objects)
 	@printf 'CCLD\t$@\n'
-	@$(CC) $(LDFLAGS) $(LIBS) -o $@ $(gmni_objects)
+	$(CC) $(LDFLAGS) -o $@ $(gmni_objects) $(LIBS)
 
 gmnlm: $(gmnlm_objects)
 	@printf 'CCLD\t$@\n'
-	@$(CC) $(LDFLAGS) $(LIBS) -o $@ $(gmnlm_objects)
+	@$(CC) $(LDFLAGS) -o $@ $(gmnlm_objects) $(LIBS)
 
 doc/gmni.1: doc/gmni.scd
 doc/gmnlm.1: doc/gmnlm.scd
