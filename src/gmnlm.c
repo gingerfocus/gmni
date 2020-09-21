@@ -23,7 +23,7 @@ struct history {
 };
 
 struct browser {
-	bool pagination;
+	bool pagination, unicode;
 	struct gemini_options opts;
 
 	FILE *tty;
@@ -184,13 +184,13 @@ display_gemini(struct browser *browser, struct gemini_response *resp)
 					trim_ws(tok.heading.title));
 			break;
 		case GEMINI_LIST_ITEM:
-			// TODO: Option to disable Unicode
-			col += fprintf(browser->tty, " • %s\n",
+			col += fprintf(browser->tty, " %s %s\n",
+					browser->unicode ? "•" : "*",
 					trim_ws(tok.list_item));
 			break;
 		case GEMINI_QUOTE:
-			// TODO: Option to disable Unicode
-			col += fprintf(browser->tty, " | %s\n",
+			col += fprintf(browser->tty, " %s %s\n",
+					browser->unicode ? "|" : "|",
 					trim_ws(tok.quote_text));
 			break;
 		}
@@ -368,19 +368,23 @@ main(int argc, char *argv[])
 {
 	struct browser browser = {
 		.pagination = true,
+		.unicode = true,
 		.url = curl_url(),
 		.tty = fopen("/dev/tty", "w+"),
 	};
 
 	int c;
-	while ((c = getopt(argc, argv, "hP")) != -1) {
+	while ((c = getopt(argc, argv, "hPU")) != -1) {
 		switch (c) {
-		case 'P':
-			browser.pagination = false;
-			break;
 		case 'h':
 			usage(argv[0]);
 			return 0;
+		case 'P':
+			browser.pagination = false;
+			break;
+		case 'U':
+			browser.unicode = false;
+			break;
 		default:
 			fprintf(stderr, "fatal: unknown flag %c\n", c);
 			return 1;
