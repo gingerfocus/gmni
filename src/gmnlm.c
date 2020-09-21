@@ -82,37 +82,45 @@ set_url(struct browser *browser, char *new_url, struct history **history)
 static enum prompt_result
 do_prompts(const char *prompt, struct browser *browser)
 {
+	enum prompt_result result;
 	fprintf(browser->tty, "%s", prompt);
 
 	size_t l = 0;
 	char *in = NULL;
 	ssize_t n = getline(&in, &l, browser->tty);
 	if (n == -1 && feof(browser->tty)) {
-		return PROMPT_QUIT;
+		result = PROMPT_QUIT;
+		goto exit;
 	}
 	if (strcmp(in, "\n") == 0) {
-		return PROMPT_MORE;
+		result = PROMPT_MORE;
+		goto exit;
 	}
 	if (strcmp(in, "q\n") == 0) {
-		return PROMPT_QUIT;
+		result = PROMPT_QUIT;
+		goto exit;
 	}
 	if (strcmp(in, "b\n") == 0) {
 		if (!browser->history->prev) {
 			fprintf(stderr, "At beginning of history\n");
-			return PROMPT_AGAIN;
+			result = PROMPT_AGAIN;
+			goto exit;
 		}
 		browser->history = browser->history->prev;
 		set_url(browser, browser->history->url, NULL);
-		return PROMPT_ANSWERED;
+		result = PROMPT_ANSWERED;
+		goto exit;
 	}
 	if (strcmp(in, "f\n") == 0) {
 		if (!browser->history->next) {
 			fprintf(stderr, "At end of history\n");
-			return PROMPT_AGAIN;
+			result = PROMPT_AGAIN;
+			goto exit;
 		}
 		browser->history = browser->history->next;
 		set_url(browser, browser->history->url, NULL);
-		return PROMPT_ANSWERED;
+		result = PROMPT_ANSWERED;
+		goto exit;
 	}
 
 	struct link *link = browser->links;
@@ -128,12 +136,17 @@ do_prompts(const char *prompt, struct browser *browser)
 			fprintf(stderr, "Error: no such link.\n");
 		} else {
 			set_url(browser, link->url, &browser->history);
-			return PROMPT_ANSWERED;
+			result = PROMPT_ANSWERED;
+			goto exit;
 		}
 	}
-	free(in);
 
-	return PROMPT_AGAIN;
+	in[n - 1] = 0; // Remove LF
+	set_url(browser, in, &browser->history);
+	result = PROMPT_ANSWERED;
+exit:
+	free(in);
+	return result;
 }
 
 static char *
@@ -278,7 +291,7 @@ display_gemini(struct browser *browser, struct gemini_response *resp)
 		if (browser->pagination && row >= ws.ws_row - 4) {
 			char prompt[4096];
 			snprintf(prompt, sizeof(prompt), "\n%s at %s\n"
-				"[Enter]: read more; [N]: follow Nth link; %s%s[q]uit\n"
+				"[Enter]: read more; [N]: follow Nth link; %s%s[q]uit; or type a URL\n"
 				"(more) => ", resp->meta, browser->plain_url,
 				browser->history->prev ? "[b]ack; " : "",
 				browser->history->next ? "[f]orward; " : "");
@@ -487,7 +500,7 @@ main(int argc, char *argv[])
 		}
 
 		snprintf(prompt, sizeof(prompt), "\n%s at %s\n"
-			"[N]: follow Nth link; %s%s[q]uit\n"
+			"[N]: follow Nth link; %s%s[q]uit; or type a URL\n"
 			"=> ",
 			resp.status == GEMINI_STATUS_SUCCESS ? resp.meta : "",
 			browser.plain_url,
