@@ -78,9 +78,13 @@ history_free(struct history *history)
 static bool
 set_url(struct browser *browser, char *new_url, struct history **history)
 {
+	if (curl_url_set(browser->url, CURLUPART_URL, new_url, 0) != CURLUE_OK) {
+		fprintf(stderr, "Error: invalid URL\n");
+		return false;
+	}
 	if (history) {
 		struct history *next = calloc(1, sizeof(struct history));
-		next->url = strdup(new_url);
+		curl_url_get(browser->url, CURLUPART_URL, &next->url, 0);
 		next->prev = *history;
 		if (*history) {
 			if ((*history)->next) {
@@ -89,10 +93,6 @@ set_url(struct browser *browser, char *new_url, struct history **history)
 			(*history)->next = next;
 		}
 		*history = next;
-	}
-	if (curl_url_set(browser->url, CURLUPART_URL, new_url, 0) != CURLUE_OK) {
-		fprintf(stderr, "Error: invalid URL\n");
-		return false;
 	}
 	return true;
 }
@@ -153,8 +153,14 @@ do_prompts(const char *prompt, struct browser *browser)
 		}
 		goto exit_re;
 	case 'n':
-		result = PROMPT_NEXT;
-		goto exit_re;
+		if (browser->searching) {
+			result = PROMPT_NEXT;
+			goto exit_re;
+		} else {
+			fprintf(stderr, "Cannot move to next result; we are not searching for anything\n");
+			result = PROMPT_AGAIN;
+			goto exit;
+		}
 	case '?':
 		fprintf(browser->tty, "%s", help_msg);
 		result = PROMPT_AGAIN;
