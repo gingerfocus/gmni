@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <ctype.h>
 #include <getopt.h>
+#include <limits.h>
 #include <openssl/bio.h>
 #include <openssl/err.h>
 #include <regex.h>
