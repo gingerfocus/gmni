@@ -240,7 +240,9 @@ gemini_response_finish(struct gemini_response *resp)
 		resp->bio = NULL;
 	}
 
-	SSL_free(resp->ssl);
+	if (resp->ssl) {
+		SSL_free(resp->ssl);
+	}
 	SSL_CTX_free(resp->ssl_ctx);
 	free(resp->meta);
 
