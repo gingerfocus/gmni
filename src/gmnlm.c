@@ -59,6 +59,7 @@ const char *help_msg =
 	"N\tFollow Nth link (where N is a number)\n"
 	"b\tBack (in the page history)\n"
 	"f\tForward (in the page history)\n"
+	"H\tView all page history\n"
 	"m\tSave bookmark\n"
 	"M\tBrowse bookmarks\n"
 	"\n"
@@ -206,16 +207,6 @@ do_prompts(const char *prompt, struct browser *browser)
 		set_url(browser, browser->history->url, NULL);
 		result = PROMPT_ANSWERED;
 		goto exit;
-	case 'm':
-		if (in[1]) break;
-		save_bookmark(browser);
-		result = PROMPT_AGAIN;
-		goto exit;
-	case 'M':
-		if (in[1]) break;
-		open_bookmarks(browser);
-		result = PROMPT_ANSWERED;
-		goto exit;
 	case 'f':
 		if (in[1]) break;
 		if (!browser->history->next) {
@@ -225,6 +216,32 @@ do_prompts(const char *prompt, struct browser *browser)
 		}
 		browser->history = browser->history->next;
 		set_url(browser, browser->history->url, NULL);
+		result = PROMPT_ANSWERED;
+		goto exit;
+	case 'H':
+		if (in[1]) break;
+		struct history *cur = browser->history;
+		while (cur->prev) cur = cur->prev;
+		while (cur != browser->history) {
+			fprintf(browser->tty, "  %s\n", cur->url);
+			cur = cur->next;
+		}
+		fprintf(browser->tty, "* %s\n", cur->url);
+		cur = cur->next;
+		while (cur) {
+			fprintf(browser->tty, "  %s\n", cur->url);
+			cur = cur->next;
+		}
+		result = PROMPT_AGAIN;
+		goto exit;
+	case 'm':
+		if (in[1]) break;
+		save_bookmark(browser);
+		result = PROMPT_AGAIN;
+		goto exit;
+	case 'M':
+		if (in[1]) break;
+		open_bookmarks(browser);
 		result = PROMPT_ANSWERED;
 		goto exit;
 	case '/':
