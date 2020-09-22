@@ -31,6 +31,7 @@ verify_callback(X509_STORE_CTX *ctx, void *data)
 	// TODO: Check that the subject name is valid for the requested URL.
 	struct gemini_tofu *tofu = (struct gemini_tofu *)data;
 	X509 *cert = X509_STORE_CTX_get0_cert(ctx);
+	struct known_host *host = NULL;
 
 	int rc;
 	int day, sec;
@@ -77,7 +78,7 @@ verify_callback(X509_STORE_CTX *ctx, void *data)
 	time(&now);
 
 	enum tofu_error error = TOFU_UNTRUSTED_CERT;
-	struct known_host *host = tofu->known_hosts;
+	host = tofu->known_hosts;
 	while (host) {
 		if (host->expires < now) {
 			goto next;
