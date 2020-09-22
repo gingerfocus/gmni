@@ -797,7 +797,9 @@ main(int argc, char *argv[])
 	}
 
 	if (optind == argc - 1) {
-		set_url(&browser, argv[optind], &browser.history);
+		if (!set_url(&browser, argv[optind], &browser.history)) {
+			return 1;
+		}
 	} else {
 		usage(argv[0]);
 		return 1;
