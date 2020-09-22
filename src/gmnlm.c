@@ -57,6 +57,7 @@ const char *help_msg =
 	"The following commands are available:\n\n"
 	"q\tQuit\n"
 	"N\tFollow Nth link (where N is a number)\n"
+	"p[N]\tShow URL of Nth link (where N is a number)\n"
 	"b\tBack (in the page history)\n"
 	"f\tForward (in the page history)\n"
 	"H\tView all page history\n"
@@ -267,6 +268,29 @@ do_prompts(const char *prompt, struct browser *browser)
 			result = PROMPT_AGAIN;
 			goto exit;
 		}
+	case 'p':
+		if (!in[1]) break;
+		struct link *link = browser->links;
+		char *endptr;
+		int linksel = (int)strtol(in+1, &endptr, 10);
+		if (!endptr[0] && linksel >= 0) {
+			while (linksel > 0 && link) {
+				link = link->next;
+				--linksel;
+			}
+
+			if (!link) {
+				fprintf(stderr, "Error: no such link.\n");
+			} else {
+				fprintf(browser->tty, "=> %s\n", link->url);
+				result = PROMPT_AGAIN;
+				goto exit;
+			}
+		} else {
+			fprintf(stderr, "Error: invalid argument.\n");
+		}
+		result = PROMPT_AGAIN;
+		goto exit;
 	case '?':
 		if (in[1]) break;
 		fprintf(browser->tty, "%s", help_msg);
