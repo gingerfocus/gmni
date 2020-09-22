@@ -31,7 +31,7 @@ doc/gmnlm.1: doc/gmnlm.scd
 docs: doc/gmni.1 doc/gmnlm.1
 
 clean:
-	@rm -f gmni doc/gmni.1 doc/gmnlm.1
+	@rm -f gmni doc/gmni.1 doc/gmnlm.1 $(gmnlm_objects) $(gmni_objects)
 
 distclean: clean
 	@rm -rf "$(OUTDIR)"
