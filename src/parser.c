@@ -113,6 +113,7 @@ gemini_parser_next(struct gemini_parser *p, struct gemini_token *tok)
 		size_t len = end - p->buf + 1;
 		memmove(p->buf, end + 1, p->bufln - len);
 		p->bufln -= len;
+		p->buf[p->bufln] = 0;
 	} else {
 		p->buf[0] = 0;
 		p->bufln = 0;
