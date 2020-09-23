@@ -246,7 +246,7 @@ do_prompts(const char *prompt, struct browser *browser)
 		result = PROMPT_ANSWERED;
 		goto exit;
 	case '/':
-		if (in[1]) break;
+		if (!in[1]) break;
 		if ((r = regcomp(&browser->regex, &in[1], REG_EXTENDED)) != 0) {
 			static char buf[1024];
 			r = regerror(r, &browser->regex, buf, sizeof(buf));
