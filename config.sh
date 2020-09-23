@@ -88,6 +88,8 @@ find_library() {
 	LIBS="$LIBS $(pkg-config --libs "$pc")"
 }
 
+docs() { true; }
+
 run_configure() {
 	mkdir -p $outdir
 
@@ -133,8 +135,11 @@ run_configure() {
 
 	all: ${all}
 	EOF
-	gmni >>"$outdir"/config.mk
-	gmnlm >>"$outdir"/config.mk
+	
+	for target in $all
+	do
+		$target >>"$outdir"/config.mk
+	done
 	echo done
 
 	touch $outdir/cppcache
