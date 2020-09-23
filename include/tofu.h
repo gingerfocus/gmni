@@ -44,5 +44,6 @@ struct gemini_tofu {
 
 void gemini_tofu_init(struct gemini_tofu *tofu,
 		SSL_CTX *ssl_ctx, tofu_callback_t *cb, void *data);
+void gemini_tofu_finish(struct gemini_tofu *tofu);
 
 #endif

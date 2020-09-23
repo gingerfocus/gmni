@@ -118,11 +118,14 @@ gemini_request(const char *url, struct gemini_options *options,
 	} else {
 		if (strcmp(scheme, "gemini") != 0) {
 			res = GEMINI_ERR_NOT_GEMINI;
+			free(scheme);
 			goto cleanup;
 		}
+		free(scheme);
 	}
 	if (curl_url_get(uri, CURLUPART_HOST, &host, 0) != CURLUE_OK) {
 		res = GEMINI_ERR_INVALID_URL;
+		free(host);
 		goto cleanup;
 	}
 
@@ -139,6 +142,7 @@ gemini_request(const char *url, struct gemini_options *options,
 	BIO *sbio = BIO_new(BIO_f_ssl());
 	res = gemini_connect(uri, options, resp, &resp->fd);
 	if (res != GEMINI_OK) {
+		free(host);
 		goto cleanup;
 	}
 
@@ -146,11 +150,14 @@ gemini_request(const char *url, struct gemini_options *options,
 	assert(resp->ssl);
 	SSL_set_connect_state(resp->ssl);
 	if ((r = SSL_set1_host(resp->ssl, host)) != 1) {
+		free(host);
 		goto ssl_error;
 	}
 	if ((r = SSL_set_tlsext_host_name(resp->ssl, host)) != 1) {
+		free(host);
 		goto ssl_error;
 	}
+	free(host);
 	if ((r = SSL_set_fd(resp->ssl, resp->fd)) != 1) {
 		goto ssl_error;
 	}
@@ -235,15 +242,16 @@ gemini_response_finish(struct gemini_response *resp)
 	}
 
 	if (resp->bio) {
-		BIO_free(BIO_pop(resp->bio)); // ssl bio
-		BIO_free(resp->bio); // buffered bio
+		BIO_free_all(resp->bio);
 		resp->bio = NULL;
 	}
 
 	if (resp->ssl) {
 		SSL_free(resp->ssl);
 	}
-	SSL_CTX_free(resp->ssl_ctx);
+	if (resp->ssl_ctx) {
+		SSL_CTX_free(resp->ssl_ctx);
+	}
 	free(resp->meta);
 
 	resp->ssl = NULL;

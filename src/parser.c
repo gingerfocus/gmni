@@ -35,15 +35,14 @@ gemini_parser_next(struct gemini_parser *p, struct gemini_token *tok)
 	memset(tok, 0, sizeof(*tok));
 
 	int eof = 0;
-	while (!strstr(p->buf, "\n")) {
-		if (p->bufln == p->bufsz) {
+	while (!strchr(p->buf, '\n')) {
+		while (p->bufln >= p->bufsz - 1) {
 			p->bufsz *= 2;
-			char *buf = realloc(p->buf, p->bufsz);
-			assert(buf);
-			p->buf = buf;
+			p->buf = realloc(p->buf, p->bufsz);
+			assert(p->buf);
 		}
 
-		int n = BIO_read(p->f, &p->buf[p->bufln], p->bufsz - p->bufln);
+		ssize_t n = BIO_read(p->f, &p->buf[p->bufln], p->bufsz - p->bufln - 1);
 		if (n == -1) {
 			return -1;
 		} else if (n == 0) {
@@ -55,7 +54,7 @@ gemini_parser_next(struct gemini_parser *p, struct gemini_token *tok)
 	}
 
 	char *end;
-	if ((end = strstr(p->buf, "\n")) != NULL) {
+	if ((end = strchr(p->buf, '\n')) != NULL) {
 		*end = 0;
 	}
 

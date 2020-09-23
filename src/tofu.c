@@ -150,7 +150,7 @@ gemini_tofu_init(struct gemini_tofu *tofu,
 		{.var = "XDG_DATA_HOME", .path = "/gmni/%s"},
 		{.var = "HOME", .path = "/.local/share/gmni/%s"}
 	};
-	const char *path_fmt = getpath(paths, sizeof(paths) / sizeof(paths[0]));
+	char *path_fmt = getpath(paths, sizeof(paths) / sizeof(paths[0]));
 	snprintf(tofu->known_hosts_path, sizeof(tofu->known_hosts_path),
 			path_fmt, "known_hosts");
 
@@ -164,6 +164,7 @@ gemini_tofu_init(struct gemini_tofu *tofu,
 
 	snprintf(tofu->known_hosts_path, sizeof(tofu->known_hosts_path),
 			path_fmt, "known_hosts");
+	free(path_fmt);
 
 	tofu->callback = cb;
 	tofu->cb_data = cb_data;
@@ -175,6 +176,7 @@ gemini_tofu_init(struct gemini_tofu *tofu,
 	}
 	size_t n = 0;
 	char *line = NULL;
+	tofu->known_hosts = NULL;
 	while (getline(&line, &n, f) != -1) {
 		struct known_host *host = calloc(1, sizeof(struct known_host));
 		char *tok = strtok(line, " ");
@@ -184,6 +186,7 @@ gemini_tofu_init(struct gemini_tofu *tofu,
 		tok = strtok(NULL, " ");
 		assert(tok);
 		if (strcmp(tok, "SHA-512") != 0) {
+			free(host->host);
 			free(host);
 			continue;
 		}
@@ -198,5 +201,20 @@ gemini_tofu_init(struct gemini_tofu *tofu,
 
 		host->next = tofu->known_hosts;
 		tofu->known_hosts = host;
+	}
+	free(line);
+	fclose(f);
+}
+
+void
+gemini_tofu_finish(struct gemini_tofu *tofu)
+{
+	struct known_host *host = tofu->known_hosts;
+	while (host) {
+		struct known_host *tmp = host;
+		host = host->next;
+		free(tmp->host);
+		free(tmp->fingerprint);
+		free(tmp);
 	}
 }

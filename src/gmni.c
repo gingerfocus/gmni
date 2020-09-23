@@ -336,6 +336,8 @@ next:
 		gemini_response_finish(&resp);
 	}
 
+	SSL_CTX_free(opts.ssl_ctx);
 	free(url);
+	gemini_tofu_finish(&cfg.tofu);
 	return ret;
 }

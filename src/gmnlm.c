@@ -83,6 +83,7 @@ history_free(struct history *history)
 		return;
 	}
 	history_free(history->next);
+	free(history->url);
 	free(history);
 }
 
@@ -92,6 +93,9 @@ set_url(struct browser *browser, char *new_url, struct history **history)
 	if (curl_url_set(browser->url, CURLUPART_URL, new_url, 0) != CURLUE_OK) {
 		fprintf(stderr, "Error: invalid URL\n");
 		return false;
+	}
+	if (browser->plain_url != NULL) {
+		free(browser->plain_url);
 	}
 	curl_url_get(browser->url, CURLUPART_URL, &browser->plain_url, 0);
 	if (history) {
@@ -130,17 +134,19 @@ trim_ws(char *in)
 static void
 save_bookmark(struct browser *browser)
 {
-	const char *path_fmt = get_data_pathfmt();
+	char *path_fmt = get_data_pathfmt();
 	static char path[PATH_MAX+1];
 	snprintf(path, sizeof(path), path_fmt, "bookmarks.gmi");
 	if (mkdirs(dirname(path), 0755) != 0) {
 		snprintf(path, sizeof(path), path_fmt, "bookmarks.gmi");
+		free(path_fmt);
 		fprintf(stderr, "Error creating directory %s: %s\n",
 				dirname(path), strerror(errno));
 		return;
 	}
 
 	snprintf(path, sizeof(path), path_fmt, "bookmarks.gmi");
+	free(path_fmt);
 	FILE *f = fopen(path, "a");
 	if (!f) {
 		fprintf(stderr, "Error opening %s for writing: %s\n",
@@ -150,7 +156,7 @@ save_bookmark(struct browser *browser)
 
 	char *title = browser->page_title;
 	if (title) {
-		title = trim_ws(browser->page_title);
+		title = trim_ws(strdup(browser->page_title));
 	}
 
 	fprintf(f, "=> %s%s%s\n", browser->plain_url,
@@ -159,6 +165,9 @@ save_bookmark(struct browser *browser)
 
 	fprintf(browser->tty, "Bookmark saved: %s\n",
 		title ? title : browser->plain_url);
+	if (title != NULL) {
+		free(title);
+	}
 }
 
 static void
@@ -411,12 +420,14 @@ repeat:
 			}
 			break;
 		case GEMINI_PREFORMATTED_BEGIN:
+			gemini_token_finish(&tok);
+			/* fallthrough */
 		case GEMINI_PREFORMATTED_END:
 			continue; // Not used
 		case GEMINI_PREFORMATTED_TEXT:
 			col += fprintf(out, "`  ");
 			if (text == NULL) {
-				text = tok.text;
+				text = tok.preformatted;
 			}
 			break;
 		case GEMINI_HEADING:
@@ -484,6 +495,9 @@ repeat:
 				text = NULL;
 			}
 		}
+		if (text == NULL) {
+			gemini_token_finish(&tok);
+		}
 
 		while (col >= ws.ws_col) {
 			col -= ws.ws_col;
@@ -510,8 +524,16 @@ repeat:
 				break;
 			case PROMPT_QUIT:
 				browser->running = false;
+				if (text != NULL) {
+					gemini_token_finish(&tok);
+				}
+				gemini_parser_finish(&p);
 				return true;
 			case PROMPT_ANSWERED:
+				if (text != NULL) {
+					gemini_token_finish(&tok);
+				}
+				gemini_parser_finish(&p);
 				return true;
 			case PROMPT_NEXT:
 				searching = true;
@@ -523,6 +545,7 @@ repeat:
 		}
 	}
 
+	gemini_token_finish(&tok);
 	gemini_parser_finish(&p);
 	return false;
 }
@@ -617,6 +640,7 @@ do_requests(struct browser *browser, struct gemini_response *resp)
 			CURLUPART_SCHEME, &scheme, 0);
 		assert(uc == CURLUE_OK); // Invariant
 		if (strcmp(scheme, "file") == 0) {
+			free(scheme);
 			requesting = false;
 
 			char *path;
@@ -630,6 +654,7 @@ do_requests(struct browser *browser, struct gemini_response *resp)
 			FILE *fp = fopen(path, "r");
 			if (!fp) {
 				resp->status = GEMINI_STATUS_NOT_FOUND;
+				free(path);
 				break;
 			}
 
@@ -643,9 +668,14 @@ do_requests(struct browser *browser, struct gemini_response *resp)
 			} else {
 				resp->meta = strdup("application/x-octet-stream");
 			}
+			free(path);
 			resp->status = GEMINI_STATUS_SUCCESS;
+			resp->fd = -1;
+			resp->ssl = NULL;
+			resp->ssl_ctx = NULL;
 			return display_response(browser, resp);
 		}
+		free(scheme);
 
 		enum gemini_result res = gemini_request(browser->plain_url,
 				&browser->opts, resp);
@@ -672,7 +702,7 @@ do_requests(struct browser *browser, struct gemini_response *resp)
 		case GEMINI_STATUS_CLASS_REDIRECT:
 			if (++nredir >= 5) {
 				requesting = false;
-				fprintf(stderr, "Error: maximum redirects (5) exceeded");
+				fprintf(stderr, "Error: maximum redirects (5) exceeded\n");
 				break;
 			}
 			fprintf(stderr, "Following redirect to %s\n", resp->meta);
@@ -816,6 +846,7 @@ main(int argc, char *argv[])
 			break;
 		default:
 			fprintf(stderr, "fatal: unknown flag %c\n", c);
+			curl_url_cleanup(browser.url);
 			return 1;
 		}
 	}
@@ -841,6 +872,7 @@ main(int argc, char *argv[])
 		static char prompt[4096];
 		if (do_requests(&browser, &resp)) {
 			// Skip prompts
+			gemini_response_finish(&resp);
 			goto next;
 		}
 
@@ -880,8 +912,16 @@ next:;
 		browser.links = NULL;
 	}
 
-	history_free(browser.history);
+	gemini_tofu_finish(&browser.tofu);
+	struct history *hist = browser.history;
+	while (hist && hist->prev) {
+		hist = hist->prev;
+	}
+	history_free(hist);
 	SSL_CTX_free(browser.opts.ssl_ctx);
 	curl_url_cleanup(browser.url);
+	free(browser.page_title);
+	free(browser.plain_url);
+	fclose(browser.tty);
 	return 0;
 }
