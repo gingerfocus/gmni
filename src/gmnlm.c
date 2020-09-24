@@ -380,6 +380,9 @@ wrap(FILE *f, char *s, struct winsize *ws, int *row, int *col)
 		case '\t':
 			*col = *col + (8 - *col % 8);
 			break;
+		case '\r':
+			if (!s[i+1]) break;
+			/* fallthrough */
 		default:
 			if (iscntrl(s[i])) {
 				s[i] = '.';
