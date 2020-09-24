@@ -9,8 +9,16 @@ SCDOC=${SCDOC:-scdoc}
 
 for arg
 do
-	# TODO: Add args for install directories
 	case "$arg" in
+		--bindir=*)
+			BINDIR=${arg#*=}
+			;;
+		--libdir=*)
+			LIBDIR=${arg#*=}
+			;;
+		--mandir=*)
+			MANDIR=${arg#*=}
+			;;
 		--prefix=*)
 			PREFIX=${arg#*=}
 			;;
