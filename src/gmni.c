@@ -315,8 +315,8 @@ main(int argc, char *argv[])
 				}
 				ssize_t w = 0;
 				while (w < (ssize_t)n) {
-					ssize_t x = write(STDOUT_FILENO, &buf[w], n - w);
-					if (x == -1) {
+					ssize_t x = fwrite(&buf[w], 1, n - w, stdout);
+					if (ferror(stdout)) {
 						fprintf(stderr, "Error: write: %s\n",
 							strerror(errno));
 						return 1;
