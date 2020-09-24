@@ -157,7 +157,7 @@ save_bookmark(struct browser *browser)
 
 	char *title = browser->page_title;
 	if (title) {
-		title = trim_ws(strdup(browser->page_title));
+		title = trim_ws(browser->page_title);
 	}
 
 	fprintf(f, "=> %s%s%s\n", browser->plain_url,
@@ -166,17 +166,15 @@ save_bookmark(struct browser *browser)
 
 	fprintf(browser->tty, "Bookmark saved: %s\n",
 		title ? title : browser->plain_url);
-	if (title != NULL) {
-		free(title);
-	}
 }
 
 static void
 open_bookmarks(struct browser *browser)
 {
-	const char *path_fmt = get_data_pathfmt();
+	char *path_fmt = get_data_pathfmt();
 	static char path[PATH_MAX+1];
 	snprintf(path, sizeof(path), path_fmt, "bookmarks.gmi");
+	free(path_fmt);
 	static char url[PATH_MAX+1+7];
 	snprintf(url, sizeof(url), "file://%s", path);
 	set_url(browser, url, &browser->history);
