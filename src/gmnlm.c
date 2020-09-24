@@ -696,11 +696,19 @@ do_requests(struct browser *browser, struct gemini_response *resp)
 				requesting = false;
 				break;
 			}
+			if (input[0] == '\0' && browser->history->prev) {
+				free(input);
+				browser->history = browser->history->prev;
+				set_url(browser, browser->history->url, NULL);
+				break;
+			}
 
 			char *new_url = gemini_input_url(
 				browser->plain_url, input);
+			free(input);
 			assert(new_url);
 			set_url(browser, new_url, NULL);
+			free(new_url);
 			break;
 		case GEMINI_STATUS_CLASS_REDIRECT:
 			if (++nredir >= 5) {
