@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <sys/ioctl.h>
+#include <sys/stat.h>
 #include <termios.h>
 #include <unistd.h>
 #include "gmni.h"
@@ -52,6 +53,17 @@ enum prompt_result {
 	PROMPT_ANSWERED,
 	PROMPT_NEXT,
 };
+
+const char *default_bookmarks =
+	"# Welcome to gmni\n\n"
+	"Links:\n\n"
+	// TODO: sub out the URL for the appropriate geminispace version once
+	// sr.ht supports gemini
+	"=> https://sr.ht/~sircmpwn/gmni The gmni browser\n"
+	"=> gemini://gemini.circumlunar.space The gemini protocol\n\n"
+	"This file can be found at %s and may be edited at your pleasure.\n\n"
+	"Bookmarks:\n"
+	;
 
 const char *help_msg =
 	"The following commands are available:\n\n"
@@ -175,6 +187,20 @@ open_bookmarks(struct browser *browser)
 	static char path[PATH_MAX+1];
 	snprintf(path, sizeof(path), path_fmt, "bookmarks.gmi");
 	free(path_fmt);
+
+	struct stat buf;
+	if (stat(path, &buf) == -1 && errno == ENOENT) {
+		// TOCTOU, but we almost certainly don't care
+		FILE *f = fopen(path, "a");
+		if (f == NULL) {
+			fprintf(stderr, "Error opening %s for writing: %s\n",
+					path, strerror(errno));
+			return;
+		}
+		fprintf(f, default_bookmarks, path);
+		fclose(f);
+	}
+
 	static char url[PATH_MAX+1+7];
 	snprintf(url, sizeof(url), "file://%s", path);
 	set_url(browser, url, &browser->history);
@@ -867,8 +893,7 @@ main(int argc, char *argv[])
 			return 1;
 		}
 	} else {
-		usage(argv[0]);
-		return 1;
+		open_bookmarks(&browser);
 	}
 
 	SSL_load_error_strings();
