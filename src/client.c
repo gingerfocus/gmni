@@ -236,11 +236,6 @@ gemini_response_finish(struct gemini_response *resp)
 		return;
 	}
 
-	if (resp->fd != -1) {
-		close(resp->fd);
-		resp->fd = -1;
-	}
-
 	if (resp->bio) {
 		BIO_free_all(resp->bio);
 		resp->bio = NULL;
@@ -253,6 +248,11 @@ gemini_response_finish(struct gemini_response *resp)
 		SSL_CTX_free(resp->ssl_ctx);
 	}
 	free(resp->meta);
+
+	if (resp->fd != -1) {
+		close(resp->fd);
+		resp->fd = -1;
+	}
 
 	resp->ssl = NULL;
 	resp->ssl_ctx = NULL;
