@@ -63,6 +63,7 @@ const char *help_msg =
 	"H\tView all page history\n"
 	"m\tSave bookmark\n"
 	"M\tBrowse bookmarks\n"
+	"r\tReload the page\n"
 	"\n"
 	"Other commands include:\n\n"
 	"<Enter>\tread more lines\n"
@@ -299,6 +300,10 @@ do_prompts(const char *prompt, struct browser *browser)
 			fprintf(stderr, "Error: invalid argument.\n");
 		}
 		result = PROMPT_AGAIN;
+		goto exit;
+	case 'r':
+		if (in[1]) break;
+		result = PROMPT_ANSWERED;
 		goto exit;
 	case '?':
 		if (in[1]) break;
