@@ -35,6 +35,7 @@ struct browser {
 	enum tofu_action tofu_mode;
 
 	FILE *tty;
+	char *meta;
 	char *plain_url;
 	char *page_title;
 	struct Curl_URL *url;
@@ -206,6 +207,52 @@ open_bookmarks(struct browser *browser)
 	set_url(browser, url, &browser->history);
 }
 
+static void
+print_media_parameters(FILE *out, char *params)
+{
+	if (params == NULL) {
+		fprintf(out, "No media parameters\n");
+		return;
+	}
+	for (char *param = strtok(params, ";"); param;
+			param = strtok(NULL, ";")) {
+		char *value = strchr(param, '=');
+		if (value == NULL) {
+			fprintf(out, "Invalid media type parameter '%s'\n",
+				trim_ws(param));
+			continue;
+		}
+		*value = 0;
+		fprintf(out, "%s: ", trim_ws(param));
+		*value++ = '=';
+		if (*value != '"') {
+			fprintf(out, "%s\n", value);
+			continue;
+		}
+		while (value++) {
+			switch (*value) {
+			case '\0':
+				if ((value = strtok(NULL, ";")) != NULL) {
+					fprintf(out, ";%c", *value);
+				}
+				break;
+			case '"':
+				value = NULL;
+				break;
+			case '\\':
+				if (value[1] == '\0') {
+					break;
+				}
+				value++;
+				/* fallthrough */
+			default:
+				putc(*value, out);
+			}
+		}
+		putc('\n', out);
+	}
+}
+
 static enum prompt_result
 do_prompts(const char *prompt, struct browser *browser)
 {
@@ -328,6 +375,12 @@ do_prompts(const char *prompt, struct browser *browser)
 	case 'r':
 		if (in[1]) break;
 		result = PROMPT_ANSWERED;
+		goto exit;
+	case 'i':
+		if (in[1]) break;
+		print_media_parameters(browser->tty, browser->meta
+				? strchr(browser->meta, ';') : NULL);
+		result = PROMPT_AGAIN;
 		goto exit;
 	case '?':
 		if (in[1]) break;
@@ -539,12 +592,19 @@ repeat:
 
 		if (browser->pagination && row >= ws.ws_row - 4) {
 			char prompt[4096];
+			char *end = NULL;
+			if (browser->meta && (end = strchr(resp->meta, ';')) != NULL) {
+				*end = 0;
+			}
 			snprintf(prompt, sizeof(prompt), "\n%s at %s\n"
 				"[Enter]: read more; %s[N]: follow Nth link; %s%s[q]uit; [?]; or type a URL\n"
 				"(more) => ", resp->meta, browser->plain_url,
 				browser->searching ? "[n]ext result; " : "",
 				browser->history->prev ? "[b]ack; " : "",
 				browser->history->next ? "[f]orward; " : "");
+			if (end != NULL) {
+				*end = ';';
+			}
 			enum prompt_result result = PROMPT_AGAIN;
 			while (result == PROMPT_AGAIN) {
 				result = do_prompts(prompt, browser);
@@ -714,6 +774,7 @@ do_requests(struct browser *browser, struct gemini_response *resp)
 		if (res != GEMINI_OK) {
 			fprintf(stderr, "Error: %s\n", gemini_strerr(res, resp));
 			requesting = false;
+			resp->status = 70 + res;
 			break;
 		}
 
@@ -858,6 +919,7 @@ main(int argc, char *argv[])
 		.unicode = true,
 		.url = curl_url(),
 		.tty = fopen("/dev/tty", "w+"),
+		.meta = NULL,
 	};
 
 	int c;
@@ -909,38 +971,45 @@ main(int argc, char *argv[])
 	browser.running = true;
 	while (browser.running) {
 		static char prompt[4096];
-		if (do_requests(&browser, &resp)) {
-			// Skip prompts
-			gemini_response_finish(&resp);
-			goto next;
+		bool skip_prompt = do_requests(&browser, &resp);
+		if (browser.meta) {
+			free(browser.meta);
 		}
-
-		snprintf(prompt, sizeof(prompt), "\n%s at %s\n"
-			"[N]: follow Nth link; %s%s[q]uit; [?]; or type a URL\n"
-			"=> ",
-			resp.status == GEMINI_STATUS_SUCCESS ? resp.meta : "",
-			browser.plain_url,
-			browser.history->prev ? "[b]ack; " : "",
-			browser.history->next ? "[f]orward; " : "");
+		browser.meta = resp.status == GEMINI_STATUS_SUCCESS
+			? strdup(resp.meta) : NULL;
 		gemini_response_finish(&resp);
+		if (!skip_prompt) {
+			char *end = NULL;
+			if (browser.meta && (end = strchr(browser.meta, ';')) != NULL) {
+				*end = 0;
+			}
+			snprintf(prompt, sizeof(prompt), "\n%s at %s\n"
+				"[N]: follow Nth link; %s%s[q]uit; [?]; or type a URL\n"
+				"=> ", browser.meta ? browser.meta
+				: "[request failed]", browser.plain_url,
+				browser.history->prev ? "[b]ack; " : "",
+				browser.history->next ? "[f]orward; " : "");
+			if (end != NULL) {
+				*end = ';';
+			}
 
-		enum prompt_result result = PROMPT_AGAIN;
-		while (result == PROMPT_AGAIN || result == PROMPT_MORE) {
-			result = do_prompts(prompt, &browser);
-		}
-		switch (result) {
-		case PROMPT_AGAIN:
-		case PROMPT_MORE:
-			assert(0);
-		case PROMPT_QUIT:
-			browser.running = false;
-			break;
-		case PROMPT_ANSWERED:
-		case PROMPT_NEXT:
-			break;
+			enum prompt_result result = PROMPT_AGAIN;
+			while (result == PROMPT_AGAIN || result == PROMPT_MORE) {
+				result = do_prompts(prompt, &browser);
+			}
+			switch (result) {
+			case PROMPT_AGAIN:
+			case PROMPT_MORE:
+				assert(0);
+			case PROMPT_QUIT:
+				browser.running = false;
+				break;
+			case PROMPT_ANSWERED:
+			case PROMPT_NEXT:
+				break;
+			}
 		}
 
-next:;
 		struct link *link = browser.links;
 		while (link) {
 			struct link *next = link->next;
@@ -961,6 +1030,9 @@ next:;
 	curl_url_cleanup(browser.url);
 	free(browser.page_title);
 	free(browser.plain_url);
+	if (browser.meta != NULL) {
+		free(browser.meta);
+	}
 	fclose(browser.tty);
 	return 0;
 }
