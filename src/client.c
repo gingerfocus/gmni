@@ -94,8 +94,7 @@ gemini_request(const char *url, struct gemini_options *options,
 {
 	assert(url);
 	assert(resp);
-	resp->meta = NULL;
-	resp->bio = NULL;
+	memset(resp, 0, sizeof(*resp));
 	if (strlen(url) > 1024) {
 		return GEMINI_ERR_INVALID_URL;
 	}
@@ -206,6 +205,7 @@ gemini_request(const char *url, struct gemini_options *options,
 	}
 
 	if (r < 3 || strcmp(&buf[r - 2], "\r\n") != 0) {
+		fprintf(stderr, "invalid line %d '%s'\n", r, buf);
 		res = GEMINI_ERR_PROTOCOL;
 		goto cleanup;
 	}
@@ -213,6 +213,7 @@ gemini_request(const char *url, struct gemini_options *options,
 	char *endptr;
 	resp->status = (enum gemini_status)strtol(buf, &endptr, 10);
 	if (*endptr != ' ' || resp->status < 10 || resp->status >= 70) {
+		fprintf(stderr, "invalid status\n");
 		res = GEMINI_ERR_PROTOCOL;
 		goto cleanup;
 	}
