@@ -147,8 +147,8 @@ gemini_tofu_init(struct gemini_tofu *tofu,
 {
 	const struct pathspec paths[] = {
 		{.var = "GMNIDATA", .path = "/%s"},
-		{.var = "XDG_DATA_HOME", .path = "/gmni/%s"},
-		{.var = "HOME", .path = "/.local/share/gmni/%s"}
+		{.var = "XDG_DATA_HOME", .path = "/gemini/%s"},
+		{.var = "HOME", .path = "/.local/share/gemini/%s"}
 	};
 	char *path_fmt = getpath(paths, sizeof(paths) / sizeof(paths[0]));
 	snprintf(tofu->known_hosts_path, sizeof(tofu->known_hosts_path),
