@@ -53,13 +53,13 @@ verify_callback(X509_STORE_CTX *ctx, void *data)
 		goto invalid_cert;
 	}
 
-	unsigned char md[256 / 8];
+	unsigned char md[512 / 8];
 	const EVP_MD *sha512 = EVP_sha512();
 	unsigned int len = sizeof(md);
 	rc = X509_digest(cert, sha512, md, &len);
 	assert(rc == 1);
 
-	char fingerprint[256 / 8 * 3];
+	char fingerprint[512 / 8 * 3];
 	for (size_t i = 0; i < sizeof(md); ++i) {
 		snprintf(&fingerprint[i * 3], 4, "%02X%s",
 			md[i], i + 1 == sizeof(md) ? "" : ":");
