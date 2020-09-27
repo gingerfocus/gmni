@@ -69,7 +69,7 @@ const char *help_msg =
 	"The following commands are available:\n\n"
 	"q\tQuit\n"
 	"N\tFollow Nth link (where N is a number)\n"
-	"p N\tShow URL of Nth link (where N is a number)\n"
+	"p[N]\tShow URL of Nth link (where N is a number)\n"
 	"b\tBack (in the page history)\n"
 	"f\tForward (in the page history)\n"
 	"H\tView all page history\n"
@@ -303,7 +303,7 @@ do_prompts(const char *prompt, struct browser *browser)
 			goto exit;
 		}
 	case 'p':
-		if (!isspace(in[1])) break;
+		if (!in[1]) break;
 		struct link *link = browser->links;
 		char *endptr;
 		int linksel = (int)strtol(in+1, &endptr, 10);
