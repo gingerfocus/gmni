@@ -6,6 +6,7 @@
 #include <openssl/evp.h>
 #include <openssl/ssl.h>
 #include <openssl/x509.h>
+#include <openssl/x509v3.h>
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
@@ -27,8 +28,6 @@ verify_callback(X509_STORE_CTX *ctx, void *data)
 	//
 	// If you're reading this code with the intent to re-use it, think
 	// twice.
-	// 
-	// TODO: Check that the subject name is valid for the requested URL.
 	struct gemini_tofu *tofu = (struct gemini_tofu *)data;
 	X509 *cert = X509_STORE_CTX_get0_cert(ctx);
 	struct known_host *host = NULL;
@@ -70,6 +69,12 @@ verify_callback(X509_STORE_CTX *ctx, void *data)
 		SSL_get_ex_data_X509_STORE_CTX_idx());
 	const char *servername = SSL_get_servername(ssl, TLSEXT_NAMETYPE_host_name);
 	if (!servername) {
+		rc = X509_V_ERR_HOSTNAME_MISMATCH;
+		goto invalid_cert;
+	}
+
+	rc = X509_check_host(cert, servername, strlen(servername), 0, NULL);
+	if (rc != 1) {
 		rc = X509_V_ERR_HOSTNAME_MISMATCH;
 		goto invalid_cert;
 	}
