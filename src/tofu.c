@@ -26,8 +26,8 @@ verify_callback(X509_STORE_CTX *ctx, void *data)
 	// opportunity to explicitly agree to trust the certificate before
 	// rejecting it.
 	//
-	// If you're reading this code with the intent to re-use it, think
-	// twice.
+	// If you're reading this code with the intent to re-use it for
+	// something unrelated to Gemini, think twice.
 	struct gemini_tofu *tofu = (struct gemini_tofu *)data;
 	X509 *cert = X509_STORE_CTX_get0_cert(ctx);
 	struct known_host *host = NULL;
