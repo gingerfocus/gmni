@@ -457,7 +457,6 @@ repeat:
 		case GEMINI_PREFORMATTED_END:
 			continue; // Not used
 		case GEMINI_PREFORMATTED_TEXT:
-			col += fprintf(out, "`  ");
 			if (text == NULL) {
 				text = tok.preformatted;
 			}
@@ -494,7 +493,8 @@ repeat:
 			}
 			break;
 		case GEMINI_QUOTE:
-			col += fprintf(out, ">  ");
+			col += fprintf(out, "%s  ",
+					browser->unicode ? "┃" : ">");
 			if (text == NULL) {
 				text = trim_ws(tok.quote_text);
 			}
