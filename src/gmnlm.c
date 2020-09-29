@@ -30,6 +30,7 @@ struct history {
 
 struct browser {
 	bool pagination, unicode;
+	int max_width;
 	struct gemini_options opts;
 	struct gemini_tofu tofu;
 	enum tofu_action tofu_mode;
@@ -473,6 +474,9 @@ display_gemini(struct browser *browser, struct gemini_response *resp)
 
 	struct winsize ws;
 	ioctl(fileno(browser->tty), TIOCGWINSZ, &ws);
+	if (browser->max_width != 0 && ws.ws_col > browser->max_width) {
+		ws.ws_col = browser->max_width;
+	}
 
 	FILE *out = browser->tty;
 	bool searching = browser->searching;
@@ -930,7 +934,7 @@ main(int argc, char *argv[])
 	};
 
 	int c;
-	while ((c = getopt(argc, argv, "hj:PU")) != -1) {
+	while ((c = getopt(argc, argv, "hj:PUW:")) != -1) {
 		switch (c) {
 		case 'h':
 			usage(argv[0]);
@@ -952,6 +956,9 @@ main(int argc, char *argv[])
 			break;
 		case 'U':
 			browser.unicode = false;
+			break;
+		case 'W':
+			browser.max_width = strtoul(optarg, NULL, 10);
 			break;
 		default:
 			fprintf(stderr, "fatal: unknown flag %c\n", c);

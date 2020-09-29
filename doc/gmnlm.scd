@@ -6,7 +6,7 @@ gmnlm - Gemini line-mode browser
 
 # SYNPOSIS
 
-*gmnlm* [-PU] [-j _mode_] _gemini://..._
+*gmnlm* [-PU] [-j _mode_] [-W _width_] _gemini://..._
 
 # DESCRIPTION
 
@@ -25,3 +25,6 @@ gmnlm - Gemini line-mode browser
 *-U*
 	Disable conservative use of Unicode symbols to render Gemini layout
 	features.
+
+*-W* _width_
+	Sets the maximum width, in columns, of Gemtext pages.
