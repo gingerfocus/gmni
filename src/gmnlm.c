@@ -188,6 +188,15 @@ open_bookmarks(struct browser *browser)
 	char *path_fmt = get_data_pathfmt();
 	static char path[PATH_MAX+1];
 	snprintf(path, sizeof(path), path_fmt, "bookmarks.gmi");
+	if (mkdirs(dirname(path), 0755) != 0) {
+		snprintf(path, sizeof(path), path_fmt, "bookmarks.gmi");
+		free(path_fmt);
+		fprintf(stderr, "Error creating directory %s: %s\n",
+				dirname(path), strerror(errno));
+		return;
+	}
+
+	snprintf(path, sizeof(path), path_fmt, "bookmarks.gmi");
 	free(path_fmt);
 
 	struct stat buf;
