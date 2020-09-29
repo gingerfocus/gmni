@@ -834,7 +834,7 @@ do_requests(struct browser *browser, struct gemini_response *resp)
 
 static enum tofu_action
 tofu_callback(enum tofu_error error, const char *fingerprint,
-	struct known_host *host, void *data)
+	struct known_host *khost, void *data)
 {
 	struct browser *browser = data;
 	if (browser->tofu_mode != TOFU_ASK) {
@@ -852,15 +852,22 @@ tofu_callback(enum tofu_error error, const char *fingerprint,
 			"trust [o]nce; [a]bort\n"
 			"=> ");
 		break;
-	case TOFU_UNTRUSTED_CERT:
+	case TOFU_UNTRUSTED_CERT:;
+		char *host;
+		if (curl_url_get(browser->url, CURLUPART_HOST, &host, 0) != CURLUE_OK) {
+			fprintf(stderr, "Error: invalid URL %s\n",
+				browser->plain_url);
+			return TOFU_FAIL;
+		}
 		snprintf(prompt, sizeof(prompt),
-			"The certificate offered by this server is of unknown trust. "
+			"The certificate offered by %s is of unknown trust. "
 			"Its fingerprint is: \n"
 			"%s\n\n"
 			"If you knew the fingerprint to expect in advance, verify that this matches.\n"
 			"Otherwise, it should be safe to trust this certificate.\n\n"
 			"[t]rust always; trust [o]nce; [a]bort\n"
-			"=> ", fingerprint);
+			"=> ", host, fingerprint);
+		free(host);
 		break;
 	case TOFU_FINGERPRINT_MISMATCH:
 		snprintf(prompt, sizeof(prompt),
@@ -871,8 +878,8 @@ tofu_callback(enum tofu_error error, const char *fingerprint,
 			"The expected fingerprint is:\n"
 			"%s\n\n"
 			"If you're certain that this is correct, edit %s:%d\n",
-			fingerprint, host->fingerprint,
-			browser->tofu.known_hosts_path, host->lineno);
+			fingerprint, khost->fingerprint,
+			browser->tofu.known_hosts_path, khost->lineno);
 		return TOFU_FAIL;
 	}
 
