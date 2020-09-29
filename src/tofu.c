@@ -175,13 +175,14 @@ gemini_tofu_init(struct gemini_tofu *tofu,
 	tofu->cb_data = cb_data;
 	SSL_CTX_set_cert_verify_callback(ssl_ctx, verify_callback, tofu);
 
+	tofu->known_hosts = NULL;
+
 	FILE *f = fopen(tofu->known_hosts_path, "r");
 	if (!f) {
 		return;
 	}
 	size_t n = 0;
 	char *line = NULL;
-	tofu->known_hosts = NULL;
 	while (getline(&line, &n, f) != -1) {
 		struct known_host *host = calloc(1, sizeof(struct known_host));
 		char *tok = strtok(line, " ");
