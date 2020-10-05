@@ -46,7 +46,7 @@ gemini_parser_next(struct gemini_parser *p, struct gemini_token *tok)
 		if (n == -1) {
 			return -1;
 		} else if (n == 0) {
-			eof = 1;
+			eof = p->bufln == 0;
 			break;
 		}
 		p->bufln += n;
