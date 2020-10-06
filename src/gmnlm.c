@@ -759,6 +759,13 @@ do_requests(struct browser *browser, struct gemini_response *resp)
 			FILE *fp = fopen(path, "r");
 			if (!fp) {
 				resp->status = GEMINI_STATUS_NOT_FOUND;
+				/* Make sure members of resp evaluate to false, so that
+					gemini_response_finish does not try to free them. */
+				resp->bio = NULL;
+				resp->ssl = NULL;
+				resp->ssl_ctx = NULL;
+				resp->meta = NULL;
+				resp->fd = -1;
 				free(path);
 				break;
 			}
