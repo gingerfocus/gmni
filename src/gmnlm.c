@@ -11,6 +11,7 @@
 #include <string.h>
 #include <sys/ioctl.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <termios.h>
 #include <unistd.h>
 #include "gmni.h"
@@ -79,6 +80,7 @@ const char *help_msg =
 	"M\tBrowse bookmarks\n"
 	"r\tReload the page\n"
 	"d <path>\tDownload page to <path>\n"
+	"|<prog>\tPipe page into program\n"
 	"\n"
 	"Other commands include:\n\n"
 	"<Enter>\tread more lines\n"
@@ -307,6 +309,55 @@ has_suffix(char *str, char *suff)
 		return false;
 	}
 	return strcmp(&str[strl - suffl], suff) == 0;
+}
+
+static void
+pipe_resp(FILE *out, struct gemini_response resp, char *cmd) {
+	char buf[BUFSIZ];
+	int pfd[2];
+	if (pipe(pfd) == -1) {
+		perror("pipe");
+		return;
+	}
+	pid_t pid;
+	switch ((pid = fork())) {
+	case -1:
+		perror("fork");
+		return;
+	case 0:
+		close(pfd[1]);
+		dup2(pfd[0], STDIN_FILENO);
+		close(pfd[0]);
+		execlp("sh", "sh", "-c", cmd);
+		perror("exec");
+		_exit(1);
+	}
+	close(pfd[0]);
+	FILE *f = fdopen(pfd[1], "w");
+	// XXX: may affect history, do we care?
+	for (int n = 1; n > 0;) {
+		n = BIO_read(resp.bio, buf, BUFSIZ);
+		if (n == -1) {
+			fprintf(stderr, "Error: read\n");
+			return;
+		}
+		ssize_t w = 0;
+		while (w < (ssize_t)n) {
+			ssize_t x = fwrite(&buf[w], 1, n - w, f);
+			if (ferror(f)) {
+				fprintf(stderr, "Error: write: %s\n",
+					strerror(errno));
+				return;
+			}
+			w += x;
+		}
+	}
+	fclose(f);
+	int status;
+	waitpid(pid, &status, 0);
+	if (status != 0) {
+		fprintf(out, "Command exited %d\n", status);
+	}
 }
 
 static enum gemini_result
@@ -570,6 +621,19 @@ do_prompts(const char *prompt, struct browser *browser)
 		set_url(browser, url, NULL);
 		download_resp(browser->tty, resp, trim_ws(&in[1]), url);
 		gemini_response_finish(&resp);
+		result = PROMPT_AGAIN;
+		goto exit;
+	case '|':
+		strncpy(&url[0], browser->plain_url, sizeof(url));
+		res = do_requests(browser, &resp);
+		if (res != GEMINI_OK) {
+			fprintf(stderr, "Error: %s\n",
+				gemini_strerr(res, &resp));
+			goto exit;
+		}
+		pipe_resp(browser->tty, resp, &in[1]);
+		gemini_response_finish(&resp);
+		set_url(browser, url, NULL);
 		result = PROMPT_AGAIN;
 		goto exit;
 	case '?':
