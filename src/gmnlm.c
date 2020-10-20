@@ -263,6 +263,167 @@ print_media_parameters(FILE *out, char *params)
 	}
 }
 
+static char *
+get_input(const struct gemini_response *resp, FILE *source)
+{
+	int r = 0;
+	struct termios attrs;
+	bool tty = fileno(source) != -1 && isatty(fileno(source));
+	char *input = NULL;
+	if (tty) {
+		fprintf(stderr, "%s: ", resp->meta);
+		if (resp->status == GEMINI_STATUS_SENSITIVE_INPUT) {
+			r = tcgetattr(fileno(source), &attrs);
+			struct termios new_attrs;
+			r = tcgetattr(fileno(source), &new_attrs);
+			if (r != -1) {
+				new_attrs.c_lflag &= ~ECHO;
+				tcsetattr(fileno(source), TCSANOW, &new_attrs);
+			}
+		}
+	}
+	size_t s = 0;
+	ssize_t n = getline(&input, &s, source);
+	if (n == -1) {
+		fprintf(stderr, "Error reading input: %s\n",
+			feof(source) ? "EOF" : strerror(ferror(source)));
+		return NULL;
+	}
+	input[n - 1] = '\0'; // Drop LF
+	if (tty && resp->status == GEMINI_STATUS_SENSITIVE_INPUT && r != -1) {
+		attrs.c_lflag &= ~ECHO;
+		tcsetattr(fileno(source), TCSANOW, &attrs);
+	}
+	return input;
+}
+
+static bool
+has_suffix(char *str, char *suff)
+{
+	size_t suffl = strlen(suff);
+	size_t strl = strlen(str);
+	if (strl < suffl) {
+		return false;
+	}
+	return strcmp(&str[strl - suffl], suff) == 0;
+}
+
+static enum gemini_result
+do_requests(struct browser *browser, struct gemini_response *resp)
+{
+	int nredir = 0;
+	bool requesting = true;
+	enum gemini_result res;
+	while (requesting) {
+		char *scheme;
+		CURLUcode uc = curl_url_get(browser->url,
+			CURLUPART_SCHEME, &scheme, 0);
+		assert(uc == CURLUE_OK); // Invariant
+		if (strcmp(scheme, "file") == 0) {
+			free(scheme);
+			requesting = false;
+
+			char *path;
+			uc = curl_url_get(browser->url,
+				CURLUPART_PATH, &path, 0);
+			if (uc != CURLUE_OK) {
+				resp->status = GEMINI_STATUS_BAD_REQUEST;
+				break;
+			}
+
+			FILE *fp = fopen(path, "r");
+			if (!fp) {
+				resp->status = GEMINI_STATUS_NOT_FOUND;
+				/* Make sure members of resp evaluate to false, so that
+					gemini_response_finish does not try to free them. */
+				resp->bio = NULL;
+				resp->ssl = NULL;
+				resp->ssl_ctx = NULL;
+				resp->meta = NULL;
+				resp->fd = -1;
+				free(path);
+				break;
+			}
+
+			BIO *file = BIO_new_fp(fp, BIO_CLOSE);
+			resp->bio = BIO_new(BIO_f_buffer());
+			BIO_push(resp->bio, file);
+			if (has_suffix(path, ".gmi") || has_suffix(path, ".gemini")) {
+				resp->meta = strdup("text/gemini");
+			} else if (has_suffix(path, ".txt")) {
+				resp->meta = strdup("text/plain");
+			} else {
+				resp->meta = strdup("application/x-octet-stream");
+			}
+			free(path);
+			resp->status = GEMINI_STATUS_SUCCESS;
+			resp->fd = -1;
+			resp->ssl = NULL;
+			resp->ssl_ctx = NULL;
+			return GEMINI_OK;
+		}
+		free(scheme);
+
+		res = gemini_request(browser->plain_url, &browser->opts, resp);
+		if (res != GEMINI_OK) {
+			fprintf(stderr, "Error: %s\n", gemini_strerr(res, resp));
+			requesting = false;
+			resp->status = 70 + res;
+			break;
+		}
+
+		char *input;
+		switch (gemini_response_class(resp->status)) {
+		case GEMINI_STATUS_CLASS_INPUT:
+			input = get_input(resp, browser->tty);
+			if (!input) {
+				requesting = false;
+				break;
+			}
+			if (input[0] == '\0' && browser->history->prev) {
+				free(input);
+				browser->history = browser->history->prev;
+				set_url(browser, browser->history->url, NULL);
+				break;
+			}
+
+			char *new_url = gemini_input_url(
+				browser->plain_url, input);
+			free(input);
+			assert(new_url);
+			set_url(browser, new_url, NULL);
+			free(new_url);
+			break;
+		case GEMINI_STATUS_CLASS_REDIRECT:
+			if (++nredir >= 5) {
+				requesting = false;
+				fprintf(stderr, "Error: maximum redirects (5) exceeded\n");
+				break;
+			}
+			set_url(browser, resp->meta, NULL);
+			break;
+		case GEMINI_STATUS_CLASS_CLIENT_CERTIFICATE_REQUIRED:
+			assert(0); // TODO
+		case GEMINI_STATUS_CLASS_TEMPORARY_FAILURE:
+		case GEMINI_STATUS_CLASS_PERMANENT_FAILURE:
+			requesting = false;
+			fprintf(stderr, "Server returned %s %d %s\n",
+				resp->status / 10 == 4 ?
+				"TEMPORARY FAILURE" : "PERMANENT FALIURE",
+				resp->status, resp->meta);
+			break;
+		case GEMINI_STATUS_CLASS_SUCCESS:
+			return res;
+		}
+
+		if (requesting) {
+			gemini_response_finish(resp);
+		}
+	}
+
+	return res;
+}
+
 static enum prompt_result
 do_prompts(const char *prompt, struct browser *browser)
 {
@@ -678,6 +839,9 @@ display_plaintext(struct browser *browser, struct gemini_response *resp)
 static bool
 display_response(struct browser *browser, struct gemini_response *resp)
 {
+	if (gemini_response_class(resp->status) != GEMINI_STATUS_CLASS_SUCCESS) {
+		return false;
+	}
 	if (strcmp(resp->meta, "text/gemini") == 0
 			|| strncmp(resp->meta, "text/gemini;", 12) == 0) {
 		return display_gemini(browser, resp);
@@ -686,170 +850,6 @@ display_response(struct browser *browser, struct gemini_response *resp)
 		return display_plaintext(browser, resp);
 	}
 	assert(0); // TODO: Deal with other mimetypes
-}
-
-static char *
-get_input(const struct gemini_response *resp, FILE *source)
-{
-	int r = 0;
-	struct termios attrs;
-	bool tty = fileno(source) != -1 && isatty(fileno(source));
-	char *input = NULL;
-	if (tty) {
-		fprintf(stderr, "%s: ", resp->meta);
-		if (resp->status == GEMINI_STATUS_SENSITIVE_INPUT) {
-			r = tcgetattr(fileno(source), &attrs);
-			struct termios new_attrs;
-			r = tcgetattr(fileno(source), &new_attrs);
-			if (r != -1) {
-				new_attrs.c_lflag &= ~ECHO;
-				tcsetattr(fileno(source), TCSANOW, &new_attrs);
-			}
-		}
-	}
-	size_t s = 0;
-	ssize_t n = getline(&input, &s, source);
-	if (n == -1) {
-		fprintf(stderr, "Error reading input: %s\n",
-			feof(source) ? "EOF" : strerror(ferror(source)));
-		return NULL;
-	}
-	input[n - 1] = '\0'; // Drop LF
-	if (tty && resp->status == GEMINI_STATUS_SENSITIVE_INPUT && r != -1) {
-		attrs.c_lflag &= ~ECHO;
-		tcsetattr(fileno(source), TCSANOW, &attrs);
-	}
-	return input;
-}
-
-static bool
-has_suffix(char *str, char *suff)
-{
-	size_t suffl = strlen(suff);
-	size_t strl = strlen(str);
-	if (strl < suffl) {
-		return false;
-	}
-	return strcmp(&str[strl - suffl], suff) == 0;
-}
-
-// Returns true to skip prompting
-static bool
-do_requests(struct browser *browser, struct gemini_response *resp)
-{
-	int nredir = 0;
-	bool requesting = true;
-	while (requesting) {
-		char *scheme;
-		CURLUcode uc = curl_url_get(browser->url,
-			CURLUPART_SCHEME, &scheme, 0);
-		assert(uc == CURLUE_OK); // Invariant
-		if (strcmp(scheme, "file") == 0) {
-			free(scheme);
-			requesting = false;
-
-			char *path;
-			uc = curl_url_get(browser->url,
-				CURLUPART_PATH, &path, 0);
-			if (uc != CURLUE_OK) {
-				resp->status = GEMINI_STATUS_BAD_REQUEST;
-				break;
-			}
-
-			FILE *fp = fopen(path, "r");
-			if (!fp) {
-				resp->status = GEMINI_STATUS_NOT_FOUND;
-				/* Make sure members of resp evaluate to false, so that
-					gemini_response_finish does not try to free them. */
-				resp->bio = NULL;
-				resp->ssl = NULL;
-				resp->ssl_ctx = NULL;
-				resp->meta = NULL;
-				resp->fd = -1;
-				free(path);
-				break;
-			}
-
-			BIO *file = BIO_new_fp(fp, BIO_CLOSE);
-			resp->bio = BIO_new(BIO_f_buffer());
-			BIO_push(resp->bio, file);
-			if (has_suffix(path, ".gmi") || has_suffix(path, ".gemini")) {
-				resp->meta = strdup("text/gemini");
-			} else if (has_suffix(path, ".txt")) {
-				resp->meta = strdup("text/plain");
-			} else {
-				resp->meta = strdup("application/x-octet-stream");
-			}
-			free(path);
-			resp->status = GEMINI_STATUS_SUCCESS;
-			resp->fd = -1;
-			resp->ssl = NULL;
-			resp->ssl_ctx = NULL;
-			return display_response(browser, resp);
-		}
-		free(scheme);
-
-		enum gemini_result res = gemini_request(browser->plain_url,
-				&browser->opts, resp);
-		if (res != GEMINI_OK) {
-			fprintf(stderr, "Error: %s\n", gemini_strerr(res, resp));
-			requesting = false;
-			resp->status = 70 + res;
-			break;
-		}
-
-		char *input;
-		switch (gemini_response_class(resp->status)) {
-		case GEMINI_STATUS_CLASS_INPUT:
-			input = get_input(resp, browser->tty);
-			if (!input) {
-				requesting = false;
-				break;
-			}
-			if (input[0] == '\0' && browser->history->prev) {
-				free(input);
-				browser->history = browser->history->prev;
-				set_url(browser, browser->history->url, NULL);
-				break;
-			}
-
-			char *new_url = gemini_input_url(
-				browser->plain_url, input);
-			free(input);
-			assert(new_url);
-			set_url(browser, new_url, NULL);
-			free(new_url);
-			break;
-		case GEMINI_STATUS_CLASS_REDIRECT:
-			if (++nredir >= 5) {
-				requesting = false;
-				fprintf(stderr, "Error: maximum redirects (5) exceeded\n");
-				break;
-			}
-			fprintf(stderr, "Following redirect to %s\n", resp->meta);
-			set_url(browser, resp->meta, NULL);
-			break;
-		case GEMINI_STATUS_CLASS_CLIENT_CERTIFICATE_REQUIRED:
-			assert(0); // TODO
-		case GEMINI_STATUS_CLASS_TEMPORARY_FAILURE:
-		case GEMINI_STATUS_CLASS_PERMANENT_FAILURE:
-			requesting = false;
-			fprintf(stderr, "Server returned %s %d %s\n",
-				resp->status / 10 == 4 ?
-				"TEMPORARY FAILURE" : "PERMANENT FALIURE",
-				resp->status, resp->meta);
-			break;
-		case GEMINI_STATUS_CLASS_SUCCESS:
-			requesting = false;
-			return display_response(browser, resp);
-		}
-
-		if (requesting) {
-			gemini_response_finish(resp);
-		}
-	}
-
-	return false;
 }
 
 static enum tofu_action
@@ -1001,7 +1001,8 @@ main(int argc, char *argv[])
 	browser.running = true;
 	while (browser.running) {
 		static char prompt[4096];
-		bool skip_prompt = do_requests(&browser, &resp);
+		bool skip_prompt = do_requests(&browser, &resp) == GEMINI_OK
+			&& display_response(&browser, &resp);
 		if (browser.meta) {
 			free(browser.meta);
 		}
