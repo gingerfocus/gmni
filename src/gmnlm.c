@@ -78,6 +78,7 @@ const char *help_msg =
 	"m\tSave bookmark\n"
 	"M\tBrowse bookmarks\n"
 	"r\tReload the page\n"
+	"d <path>\tDownload page to <path>\n"
 	"\n"
 	"Other commands include:\n\n"
 	"<Enter>\tread more lines\n"
@@ -553,6 +554,24 @@ do_prompts(const char *prompt, struct browser *browser)
 				? strchr(browser->meta, ';') : NULL);
 		result = PROMPT_AGAIN;
 		goto exit;
+	case 'd':
+		if (in[1] != '\0' && !isspace(in[1])) break;
+		struct gemini_response resp;
+		char url[1024] = {0};
+		strncpy(&url[0], browser->plain_url, sizeof(url));
+		// XXX: may affect history, do we care?
+		enum gemini_result res = do_requests(browser, &resp);
+		if (res != GEMINI_OK) {
+			fprintf(stderr, "Error: %s\n",
+				gemini_strerr(res, &resp));
+			result = PROMPT_AGAIN;
+			goto exit;
+		}
+		set_url(browser, url, NULL);
+		download_resp(browser->tty, resp, trim_ws(&in[1]), url);
+		gemini_response_finish(&resp);
+		result = PROMPT_AGAIN;
+		goto exit;
 	case '?':
 		if (in[1]) break;
 		fprintf(browser->tty, "%s", help_msg);
@@ -849,7 +868,9 @@ display_response(struct browser *browser, struct gemini_response *resp)
 	if (strncmp(resp->meta, "text/", 5) == 0) {
 		return display_plaintext(browser, resp);
 	}
-	assert(0); // TODO: Deal with other mimetypes
+	fprintf(stderr, "Media type %s is unsupported, use \"d <path>\" to download this page\n",
+		resp->meta);
+	return false;
 }
 
 static enum tofu_action

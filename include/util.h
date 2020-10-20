@@ -8,5 +8,7 @@ struct pathspec {
 
 char *getpath(const struct pathspec *paths, size_t npaths);
 int mkdirs(char *path, mode_t mode);
+int download_resp(FILE *out, struct gemini_response resp, const char *path,
+		char *url);
 
 #endif

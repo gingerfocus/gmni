@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
+#include "gmni.h"
 #include "tofu.h"
 #include "util.h"
 

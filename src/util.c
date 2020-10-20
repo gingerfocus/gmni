@@ -2,9 +2,12 @@
 #include <errno.h>
 #include <libgen.h>
 #include <limits.h>
+#include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include "gmni.h"
 #include "util.h"
 
 static void
@@ -59,4 +62,47 @@ getpath(const struct pathspec *paths, size_t npaths) {
 		}
 	}
 	return NULL;
+}
+
+int
+download_resp(FILE *out, struct gemini_response resp, const char *path,
+		char *url)
+{
+	char buf[PATH_MAX];
+	assert(path);
+	if (path[0] == '\0') {
+		path = "./";
+	}
+	if (path[strlen(path)-1] == '/') {
+		strncat(strncpy(&buf[0], path, sizeof(buf)), basename(url),
+			sizeof(buf));
+		path = &buf[0];
+	}
+	FILE *f = fopen(path, "w");
+	if (f == NULL) {
+		fprintf(stderr, "Could not open %s for writing: %s\n",
+			path, strerror(errno));
+		return 1;
+	}
+	fprintf(out, "Downloading %s to %s\n", url, path);
+	for (int n = 1; n > 0;) {
+		n = BIO_read(resp.bio, buf, BUFSIZ);
+		if (n == -1) {
+			fprintf(stderr, "Error: read\n");
+			return 1;
+		}
+		ssize_t w = 0;
+		while (w < (ssize_t)n) {
+			ssize_t x = fwrite(&buf[w], 1, n - w, f);
+			if (ferror(f)) {
+				fprintf(stderr, "Error: write: %s\n",
+					strerror(errno));
+				return 1;
+			}
+			w += x;
+		}
+	}
+	fprintf(out, "Finished download\n");
+	fclose(f);
+	return 0;
 }

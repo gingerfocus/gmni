@@ -68,3 +68,7 @@ performed with the user's input supplied to the server.
 	Suppress the input prompt if the server requests an input, and instead
 	print a diagnostic message and exit with a zero (successful) status
 	code.
+
+*-o* _path_
+	Write output to _path_. If _path_ ends with a '/', the basename of the URL
+	will be appended. If _path_ is the empty string, "./" will be presumed.

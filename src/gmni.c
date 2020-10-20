@@ -14,6 +14,7 @@
 #include <unistd.h>
 #include "gmni.h"
 #include "tofu.h"
+#include "util.h"
 
 static void
 usage(const char *argv_0)
@@ -125,6 +126,8 @@ main(int argc, char *argv[])
 	enum input_mode input_mode = INPUT_READ;
 	FILE *input_source = stdin;
 
+	char *output_file = NULL;
+
 	bool follow_redirects = false, linefeed = true;
 	int max_redirect = 5;
 
@@ -136,7 +139,7 @@ main(int argc, char *argv[])
 	cfg.action = TOFU_ASK;
 
 	int c;
-	while ((c = getopt(argc, argv, "46d:D:E:hj:lLiINR:")) != -1) {
+	while ((c = getopt(argc, argv, "46d:D:E:hj:lLiINR:o:")) != -1) {
 		switch (c) {
 		case '4':
 			hints.ai_family = AF_INET;
@@ -203,6 +206,9 @@ main(int argc, char *argv[])
 				fprintf(stderr, "Error: -R expects numeric argument\n");
 				return 1;
 			}
+			break;
+		case 'o':
+			output_file = optarg;
 			break;
 		default:
 			fprintf(stderr, "fatal: unknown flag %c\n", c);
@@ -301,6 +307,11 @@ main(int argc, char *argv[])
 		case OMIT_HEADERS:
 			if (gemini_response_class(resp.status) !=
 					GEMINI_STATUS_CLASS_SUCCESS) {
+				break;
+			}
+
+			if (output_file != NULL) {
+				ret = download_resp(stderr, resp, output_file, url);
 				break;
 			}
 
