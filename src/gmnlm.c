@@ -908,10 +908,21 @@ display_plaintext(struct browser *browser, struct gemini_response *resp)
 	ioctl(fileno(browser->tty), TIOCGWINSZ, &ws);
 
 	char buf[BUFSIZ];
-	int n;
-	while ((n = BIO_read(resp->bio, buf, sizeof(buf)) != 0)) {
-		while (n) {
-			n -= fwrite(buf, 1, n, browser->tty);
+	for (int n = 1; n > 0;) {
+		n = BIO_read(resp->bio, buf, BUFSIZ);
+		if (n == -1) {
+			fprintf(stderr, "Error: read\n");
+			return 1;
+		}
+		ssize_t w = 0;
+		while (w < (ssize_t)n) {
+			ssize_t x = fwrite(&buf[w], 1, n - w, browser->tty);
+			if (ferror(browser->tty)) {
+				fprintf(stderr, "Error: write: %s\n",
+					strerror(errno));
+				return 1;
+			}
+			w += x;
 		}
 	}
 
