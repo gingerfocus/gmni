@@ -63,7 +63,7 @@ install: all
 	install -Dm644 include/gmni/gmni.h $(INCLUDEDIR)/gmni/gmni.h
 	install -Dm644 include/gmni/tofu.h $(INCLUDEDIR)/gmni/tofu.h
 	install -Dm644 include/gmni/url.h $(INCLUDEDIR)/gmni/url.h
-	install -Dm644 libgmni.pc $(LIBDIR)/pkgconfig
+	install -Dm644 libgmni.pc $(LIBDIR)/pkgconfig/libgmni.pc
 	install -Dm644 doc/gmni.1 $(MANDIR)/man1/gmni.1
 	install -Dm644 doc/gmnlm.1 $(MANDIR)/man1/gmnlm.1
 
