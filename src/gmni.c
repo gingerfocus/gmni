@@ -315,7 +315,7 @@ main(int argc, char *argv[])
 				break;
 			}
 
-			char last;
+			char last = 0;
 			char buf[BUFSIZ];
 			for (int n = 1; n > 0;) {
 				n = BIO_read(resp.bio, buf, BUFSIZ);
