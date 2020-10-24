@@ -40,7 +40,7 @@ libgmni.pc:
 	@touch $(OUTDIR)/cppcache
 	@grep $< $(OUTDIR)/cppcache >/dev/null || \
 		$(CPP) $(CFLAGS) -MM -MT $@ $< >> $(OUTDIR)/cppcache
-	@$(CC) -c -fPIC $(CFLAGS) -o $@ $<
+	@$(CC) -c $(CFLAGS) -o $@ $<
 
 .scd.1:
 	@printf 'SCDOC\t$@\n'
