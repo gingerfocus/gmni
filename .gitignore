@@ -1,6 +1,6 @@
 .build
 build
-gmni
+/gmni
 gmnlm
 *.1
 *.o
