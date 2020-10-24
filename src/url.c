@@ -31,7 +31,7 @@
 #include <string.h>
 #include <strings.h>
 #include "escape.h"
-#include "url.h"
+#include <gmni/url.h>
 
 /* Provided by gmni */
 static char *

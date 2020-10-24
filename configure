@@ -23,6 +23,21 @@ gmnlm() {
 		src/util.c
 }
 
-all="gmni gmnlm"
+libgmni_a() {
+	genrules libgmni.a \
+		src/client.c \
+		src/escape.c \
+		src/tofu.c \
+		src/url.c \
+		src/util.c \
+		src/parser.c
+}
+
+libgmni_pc() {
+	:
+}
+
+all="gmni gmnlm libgmni.a libgmni.pc"
+
 
 run_configure

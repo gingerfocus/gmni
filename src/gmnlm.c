@@ -14,9 +14,9 @@
 #include <sys/wait.h>
 #include <termios.h>
 #include <unistd.h>
-#include "gmni.h"
-#include "tofu.h"
-#include "url.h"
+#include <gmni/gmni.h>
+#include <gmni/tofu.h>
+#include <gmni/url.h>
 #include "util.h"
 
 struct link {

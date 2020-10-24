@@ -134,6 +134,7 @@ run_configure() {
 	_INSTDIR=\$(DESTDIR)\$(PREFIX)
 	BINDIR?=${BINDIR:-\$(_INSTDIR)/bin}
 	LIBDIR?=${LIBDIR:-\$(_INSTDIR)/lib}
+	INCLUDEDIR?=${INCLUDEDIR:-\$(_INSTDIR)/include}
 	MANDIR?=${MANDIR:-\$(_INSTDIR)/share/man}
 	CACHE=\$(OUTDIR)/cache
 	CFLAGS=${CFLAGS}
@@ -146,7 +147,7 @@ run_configure() {
 	
 	for target in $all
 	do
-		$target >>"$outdir"/config.mk
+		${target//./_} >>"$outdir"/config.mk
 	done
 	echo done
 

@@ -4,3 +4,5 @@ gmni
 gmnlm
 *.1
 *.o
+*.a
+*.pc

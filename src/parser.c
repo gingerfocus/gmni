@@ -5,7 +5,7 @@
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
-#include "gmni.h"
+#include <gmni/gmni.h>
 
 void
 gemini_parser_init(struct gemini_parser *p, BIO *f)

@@ -12,8 +12,8 @@
 #include <sys/types.h>
 #include <termios.h>
 #include <unistd.h>
-#include "gmni.h"
-#include "tofu.h"
+#include <gmni/gmni.h>
+#include <gmni/tofu.h>
 #include "util.h"
 
 static void

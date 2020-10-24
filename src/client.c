@@ -9,8 +9,8 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <unistd.h>
-#include "gmni.h"
-#include "url.h"
+#include <gmni/gmni.h>
+#include <gmni/url.h>
 
 static enum gemini_result
 gemini_get_addrinfo(struct Curl_URL *uri, struct gemini_options *options, 
