@@ -144,11 +144,11 @@ run_configure() {
 
 	all: ${all}
 	EOF
-	
-	for target in $all
+
+	for target in $(printf '%s\n' $all | tr '.' '_')
 	do
-		${target//./_} >>"$outdir"/config.mk
-	done
+		$target
+	done >>"$outdir"/config.mk
 	echo done
 
 	touch $outdir/cppcache
