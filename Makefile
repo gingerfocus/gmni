@@ -67,4 +67,13 @@ install: all
 	install -Dm644 doc/gmni.1 $(MANDIR)/man1/gmni.1
 	install -Dm644 doc/gmnlm.1 $(MANDIR)/man1/gmnlm.1
 
+uninstall:
+	rm -f $(BINDIR)/gmni
+	rm -f $(BINDIR)/gmnlm
+	rm -f $(LIBDIR)/libgmni.a
+	rm -rf $(INCLUDEDIR)/gmni
+	rm -f $(LIBDIR)/pkgconfig/libgmni.pc
+	rm -f $(MANDIR)/man1/gmni.1
+	rm -f $(MANDIR)/man1/gmnlm.1
+
 .PHONY: clean distclean docs install
