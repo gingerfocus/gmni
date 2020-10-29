@@ -68,15 +68,15 @@ int
 download_resp(FILE *out, struct gemini_response resp, const char *path,
 		char *url)
 {
-	char buf[PATH_MAX];
+	char path_buf[PATH_MAX];
 	assert(path);
 	if (path[0] == '\0') {
 		path = "./";
 	}
 	if (path[strlen(path)-1] == '/') {
-		strncat(strncpy(&buf[0], path, sizeof(buf)), basename(url),
-			sizeof(buf));
-		path = &buf[0];
+		int n = snprintf(path_buf, sizeof(path_buf), "%s%s", path, basename(url));
+		assert((size_t)n < sizeof(path_buf));
+		path = path_buf;
 	}
 	FILE *f = fopen(path, "w");
 	if (f == NULL) {
@@ -85,8 +85,9 @@ download_resp(FILE *out, struct gemini_response resp, const char *path,
 		return 1;
 	}
 	fprintf(out, "Downloading %s to %s\n", url, path);
+	char buf[BUFSIZ];
 	for (int n = 1; n > 0;) {
-		n = BIO_read(resp.bio, buf, BUFSIZ);
+		n = BIO_read(resp.bio, buf, sizeof(buf));
 		if (n == -1) {
 			fprintf(stderr, "Error: read\n");
 			return 1;
