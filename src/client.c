@@ -212,7 +212,7 @@ gemini_request(const char *url, struct gemini_options *options,
 
 	char *endptr;
 	resp->status = (enum gemini_status)strtol(buf, &endptr, 10);
-	if (*endptr != ' ' || resp->status < 10 || resp->status >= 70) {
+	if (*endptr != ' ' || resp->status < 10 || (int)resp->status >= 70) {
 		fprintf(stderr, "invalid status\n");
 		res = GEMINI_ERR_PROTOCOL;
 		goto cleanup;
