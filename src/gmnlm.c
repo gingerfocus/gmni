@@ -629,6 +629,7 @@ do_prompts(const char *prompt, struct browser *browser)
 		if (res != GEMINI_OK) {
 			fprintf(stderr, "Error: %s\n",
 				gemini_strerr(res, &resp));
+			result = PROMPT_AGAIN;
 			goto exit;
 		}
 		pipe_resp(browser->tty, resp, &in[1]);
