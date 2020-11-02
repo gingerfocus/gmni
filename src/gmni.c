@@ -20,7 +20,7 @@ static void
 usage(const char *argv_0)
 {
 	fprintf(stderr,
-		"usage: %s [-46lLiIN] [-E cert] [-d input] [-D path] gemini://...\n",
+		"usage: %s [-46lLiIN] [-j mode] [-E cert] [-d input] [-D path] gemini://...\n",
 		argv_0);
 }
 
@@ -86,7 +86,7 @@ tofu_callback(enum tofu_error error, const char *fingerprint,
 			"The certificate offered by this server is of unknown trust. "
 			"Its fingerprint is: \n"
 			"%s\n\n"
-			"Use -j once to trust temporarily, or -j always to add to the trust store.\n", fingerprint);
+			"Use '-j once' to trust temporarily, or '-j always' to add to the trust store.\n", fingerprint);
 		break;
 	case TOFU_FINGERPRINT_MISMATCH:
 		fprintf(stderr,
