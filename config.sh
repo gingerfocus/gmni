@@ -85,6 +85,11 @@ find_library() {
 	name="$1"
 	pc="$2"
 	printf "Checking for %s... " "$name"
+	if ! command -v pkg-config >/dev/null
+	then
+		printf "ERROR: pkg-config not found\n"
+		return 1
+	fi
 	if ! pkg-config "$pc" 2>/dev/null
 	then
 		printf "NOT FOUND\n"
