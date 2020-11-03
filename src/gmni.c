@@ -287,7 +287,7 @@ main(int argc, char *argv[])
 			if (header_mode == OMIT_HEADERS) {
 				fprintf(stderr, "%s: %d %s\n",
 					resp.status / 10 == 4 ?
-					"TEMPORARY FAILURE" : "PERMANENT FALIURE",
+					"TEMPORARY FAILURE" : "PERMANENT FAILURE",
 					resp.status, resp.meta);
 			}
 			exit = true;
