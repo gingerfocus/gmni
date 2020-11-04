@@ -127,8 +127,8 @@ run_configure() {
 		all="$all docs"
 		install_docs="
 	mkdir -p \$(MANDIR)/man1
-	install -Dm644 doc/gmni.1 \$(MANDIR)/man1/gmni.1
-	install -Dm644 doc/gmnlm.1 \$(MANDIR)/man1/gmnlm.1"
+	install -m644 doc/gmni.1 \$(MANDIR)/man1/gmni.1
+	install -m644 doc/gmnlm.1 \$(MANDIR)/man1/gmnlm.1"
 	else
 		echo no
 	fi

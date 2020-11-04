@@ -56,13 +56,16 @@ distclean: clean
 
 install: all install_docs
 	mkdir -p $(BINDIR)
-	install -Dm755 gmni $(BINDIR)/gmni
-	install -Dm755 gmnlm $(BINDIR)/gmnlm
-	install -Dm755 libgmni.a $(LIBDIR)/libgmni.a
-	install -Dm644 include/gmni/gmni.h $(INCLUDEDIR)/gmni/gmni.h
-	install -Dm644 include/gmni/tofu.h $(INCLUDEDIR)/gmni/tofu.h
-	install -Dm644 include/gmni/url.h $(INCLUDEDIR)/gmni/url.h
-	install -Dm644 libgmni.pc $(LIBDIR)/pkgconfig/libgmni.pc
+	mkdir -p $(LIBDIR)
+	mkdir -p $(INCLUDEDIR)/gmni
+	mkdir -p $(LIBDIR)/pkgconfig
+	install -m755 gmni $(BINDIR)/gmni
+	install -m755 gmnlm $(BINDIR)/gmnlm
+	install -m755 libgmni.a $(LIBDIR)/libgmni.a
+	install -m644 include/gmni/gmni.h $(INCLUDEDIR)/gmni/gmni.h
+	install -m644 include/gmni/tofu.h $(INCLUDEDIR)/gmni/tofu.h
+	install -m644 include/gmni/url.h $(INCLUDEDIR)/gmni/url.h
+	install -m644 libgmni.pc $(LIBDIR)/pkgconfig/libgmni.pc
 
 uninstall:
 	rm -f $(BINDIR)/gmni
