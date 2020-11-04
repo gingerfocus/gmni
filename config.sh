@@ -125,6 +125,10 @@ run_configure() {
 	then
 		echo yes
 		all="$all docs"
+		install_docs="
+	mkdir -p \$(MANDIR)/man1
+	install -Dm644 doc/gmni.1 \$(MANDIR)/man1/gmni.1
+	install -Dm644 doc/gmnlm.1 \$(MANDIR)/man1/gmnlm.1"
 	else
 		echo no
 	fi
@@ -148,6 +152,7 @@ run_configure() {
 	CFLAGS+=-DLIBDIR='"\$(LIBDIR)"'
 
 	all: ${all}
+	install_docs: ${install_docs}
 	EOF
 
 	for target in $(printf '%s\n' $all | tr '.' '_')

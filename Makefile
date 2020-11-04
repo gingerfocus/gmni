@@ -54,9 +54,8 @@ clean:
 distclean: clean
 	@rm -rf "$(OUTDIR)"
 
-install: all
+install: all install_docs
 	mkdir -p $(BINDIR)
-	mkdir -p $(MANDIR)/man1
 	install -Dm755 gmni $(BINDIR)/gmni
 	install -Dm755 gmnlm $(BINDIR)/gmnlm
 	install -Dm755 libgmni.a $(LIBDIR)/libgmni.a
@@ -64,8 +63,6 @@ install: all
 	install -Dm644 include/gmni/tofu.h $(INCLUDEDIR)/gmni/tofu.h
 	install -Dm644 include/gmni/url.h $(INCLUDEDIR)/gmni/url.h
 	install -Dm644 libgmni.pc $(LIBDIR)/pkgconfig/libgmni.pc
-	install -Dm644 doc/gmni.1 $(MANDIR)/man1/gmni.1
-	install -Dm644 doc/gmnlm.1 $(MANDIR)/man1/gmnlm.1
 
 uninstall:
 	rm -f $(BINDIR)/gmni
