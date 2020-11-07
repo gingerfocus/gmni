@@ -609,7 +609,7 @@ do_prompts(const char *prompt, struct browser *browser)
 		if (in[1] != '\0' && !isspace(in[1])) break;
 		struct gemini_response resp;
 		char url[1024] = {0};
-		strncpy(&url[0], browser->plain_url, sizeof(url));
+		strncpy(&url[0], browser->plain_url, sizeof(url)-1);
 		// XXX: may affect history, do we care?
 		enum gemini_result res = do_requests(browser, &resp);
 		if (res != GEMINI_OK) {
@@ -624,7 +624,7 @@ do_prompts(const char *prompt, struct browser *browser)
 		result = PROMPT_AGAIN;
 		goto exit;
 	case '|':
-		strncpy(&url[0], browser->plain_url, sizeof(url));
+		strncpy(&url[0], browser->plain_url, sizeof(url)-1);
 		res = do_requests(browser, &resp);
 		if (res != GEMINI_OK) {
 			fprintf(stderr, "Error: %s\n",
