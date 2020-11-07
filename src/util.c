@@ -19,13 +19,8 @@ posix_dirname(char *path, char *dname)
 	assert(strlen(path) <= PATH_MAX);
 
 	strcpy(p, path);
-	t = dirname(path);
+	t = dirname(p);
 	memmove(dname, t, strlen(t) + 1);
-
-	/* restore the path if dirname worked in-place */
-	if (t == path && path != dname) {
-		strcpy(path, p);
-	}
 }
 
 /** Make directory and all of its parents */
