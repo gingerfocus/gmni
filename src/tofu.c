@@ -157,10 +157,15 @@ gemini_tofu_init(struct gemini_tofu *tofu,
 		{.var = "HOME", .path = "/.local/share/gemini/%s"}
 	};
 	char *path_fmt = getpath(paths, sizeof(paths) / sizeof(paths[0]));
-	snprintf(tofu->known_hosts_path, sizeof(tofu->known_hosts_path),
-			path_fmt, "known_hosts");
+	char dname[PATH_MAX+1];
+	size_t n = 0;
 
-	if (mkdirs(dirname(tofu->known_hosts_path), 0755) != 0) {
+	n = snprintf(tofu->known_hosts_path, sizeof(tofu->known_hosts_path),
+			path_fmt, "known_hosts");
+	assert(n < sizeof(tofu->known_hosts_path));
+
+	strncpy(dname, dirname(tofu->known_hosts_path), sizeof(dname));
+	if (mkdirs(dname, 0755) != 0) {
 		snprintf(tofu->known_hosts_path, sizeof(tofu->known_hosts_path),
 				path_fmt, "known_hosts");
 		fprintf(stderr, "Error creating directory %s: %s\n",
@@ -182,7 +187,7 @@ gemini_tofu_init(struct gemini_tofu *tofu,
 	if (!f) {
 		return;
 	}
-	size_t n = 0;
+	n = 0;
 	char *line = NULL;
 	while (getline(&line, &n, f) != -1) {
 		struct known_host *host = calloc(1, sizeof(struct known_host));
