@@ -471,7 +471,7 @@ do_requests(struct browser *browser, struct gemini_response *resp)
 			requesting = false;
 			fprintf(stderr, "Server returned %s %d %s\n",
 				resp->status / 10 == 4 ?
-				"TEMPORARY FAILURE" : "PERMANENT FALIURE",
+				"TEMPORARY FAILURE" : "PERMANENT FAILURE",
 				resp->status, resp->meta);
 			break;
 		case GEMINI_STATUS_CLASS_SUCCESS:
