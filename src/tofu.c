@@ -164,7 +164,7 @@ gemini_tofu_init(struct gemini_tofu *tofu,
 			path_fmt, "known_hosts");
 	assert(n < sizeof(tofu->known_hosts_path));
 
-	strncpy(dname, dirname(tofu->known_hosts_path), sizeof(dname));
+	strncpy(dname, dirname(tofu->known_hosts_path), sizeof(dname)-1);
 	if (mkdirs(dname, 0755) != 0) {
 		snprintf(tofu->known_hosts_path, sizeof(tofu->known_hosts_path),
 				path_fmt, "known_hosts");

@@ -159,7 +159,7 @@ save_bookmark(struct browser *browser)
 
 	n = snprintf(path, sizeof(path), path_fmt, "bookmarks.gmi");
 	assert(n < sizeof(path));
-	strncpy(dname, dirname(path), sizeof(dname));
+	strncpy(dname, dirname(path), sizeof(dname)-1);
 	if (mkdirs(dname, 0755) != 0) {
 		snprintf(path, sizeof(path), path_fmt, "bookmarks.gmi");
 		free(path_fmt);
@@ -200,7 +200,7 @@ open_bookmarks(struct browser *browser)
 
 	n = snprintf(path, sizeof(path), path_fmt, "bookmarks.gmi");
 	assert(n < sizeof(path));
-	strncpy(dname, dirname(path), sizeof(dname));
+	strncpy(dname, dirname(path), sizeof(dname)-1);
 	if (mkdirs(dname, 0755) != 0) {
 		snprintf(path, sizeof(path), path_fmt, "bookmarks.gmi");
 		free(path_fmt);
