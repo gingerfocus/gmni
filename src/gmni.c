@@ -14,6 +14,7 @@
 #include <unistd.h>
 #include <gmni/gmni.h>
 #include <gmni/tofu.h>
+#include <gmni/url.h>
 #include "util.h"
 
 static void
@@ -227,12 +228,24 @@ main(int argc, char *argv[])
 	gemini_tofu_init(&cfg.tofu, opts.ssl_ctx, &tofu_callback, &cfg);
 
 	bool exit = false;
-	char *url = strdup(argv[optind]);
+	struct Curl_URL *url = curl_url();
+
+	if(curl_url_set(url, CURLUPART_URL, argv[optind], 0) != CURLUE_OK) {
+		// TODO: Better error
+		fprintf(stderr, "Error: invalid URL\n");
+		return 1;
+	}
 
 	int ret = 0, nredir = 0;
 	while (!exit) {
+		char *buf;
+		curl_url_get(url, CURLUPART_URL, &buf, 0);
+
 		struct gemini_response resp;
-		enum gemini_result r = gemini_request(url, &opts, &resp);
+		enum gemini_result r = gemini_request(buf, &opts, &resp);
+
+		free(buf);
+
 		if (r != GEMINI_OK) {
 			fprintf(stderr, "Error: %s\n", gemini_strerr(r, &resp));
 			ret = (int)r;
@@ -254,12 +267,16 @@ main(int argc, char *argv[])
 				break;
 			}
 
-			char *new_url = gemini_input_url(url, input);
+			char *buf;
+			curl_url_get(url, CURLUPART_URL, &buf, 0);
+
+			char *new_url = gemini_input_url(buf, input);
 			assert(new_url);
 
 			free(input);
-			free(url);
-			url = new_url;
+			free(buf);
+
+			curl_url_set(url, CURLUPART_URL, new_url, 0);
 			goto next;
 		case GEMINI_STATUS_CLASS_REDIRECT:
 			if (++nredir >= max_redirect) {
@@ -270,8 +287,8 @@ main(int argc, char *argv[])
 				goto next;
 			}
 
-			free(url);
-			url = strdup(resp.meta);
+			curl_url_set(url, CURLUPART_URL, resp.meta, 0);
+
 			if (!follow_redirects) {
 				if (header_mode == OMIT_HEADERS) {
 					fprintf(stderr, "REDIRECT: %d %s\n",
@@ -311,7 +328,12 @@ main(int argc, char *argv[])
 			}
 
 			if (output_file != NULL) {
-				ret = download_resp(stderr, resp, output_file, url);
+				char *buf;
+				curl_url_get(url, CURLUPART_URL, &buf, 0);
+
+				ret = download_resp(stderr, resp, output_file, buf);
+				free(buf);
+
 				break;
 			}
 
@@ -349,7 +371,7 @@ next:
 	}
 
 	SSL_CTX_free(opts.ssl_ctx);
-	free(url);
+	curl_url_cleanup(url);
 	gemini_tofu_finish(&cfg.tofu);
 	return ret;
 }
