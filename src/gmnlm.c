@@ -657,7 +657,7 @@ do_prompts(const char *prompt, struct browser *browser)
 	struct link *link = browser->links;
 	char *endptr;
 	int linksel = (int)strtol(in, &endptr, 10);
-	if (!endptr[0] && linksel >= 0) {
+	if ((endptr[0] == '\0' || endptr[0] == '|') && linksel >= 0) {
 		while (linksel > 0 && link) {
 			link = link->next;
 			--linksel;
@@ -665,7 +665,26 @@ do_prompts(const char *prompt, struct browser *browser)
 
 		if (!link) {
 			fprintf(stderr, "Error: no such link.\n");
+		} else if (endptr[0] == '|') {
+			char url[1024] = {0};
+			struct gemini_response resp;
+			strncpy(url, browser->plain_url, sizeof(url) - 1);
+			set_url(browser, link->url, &browser->history);
+			enum gemini_result res = do_requests(browser, &resp);
+			if (res != GEMINI_OK) {
+				fprintf(stderr, "Error: %s\n",
+					gemini_strerr(res, &resp));
+				set_url(browser, url, NULL);
+				result = PROMPT_AGAIN;
+				goto exit;
+			}
+			pipe_resp(browser->tty, resp, &endptr[1]);
+			gemini_response_finish(&resp);
+			set_url(browser, url, NULL);
+			result = PROMPT_AGAIN;
+			goto exit;
 		} else {
+			assert(endptr[0] == '\0');
 			set_url(browser, link->url, &browser->history);
 			result = PROMPT_ANSWERED;
 			goto exit;
