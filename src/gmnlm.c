@@ -721,6 +721,9 @@ wrap(FILE *f, char *s, struct winsize *ws, int *row, int *col)
 			if (!s[i+1]) break;
 			/* fallthrough */
 		default:
+			// skip unicode continuation bytes
+			if ((s[i] & 0xc0) == 0x80) break;
+
 			if (iscntrl(s[i])) {
 				s[i] = '.';
 			}
