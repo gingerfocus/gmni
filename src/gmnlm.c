@@ -739,7 +739,7 @@ wrap(FILE *f, char *s, struct winsize *ws, int *row, int *col)
 			}
 			char c = s[i];
 			s[i] = 0;
-			int n = fprintf(f, "%s\n", s);
+			int n = fprintf(f, "%s\n", s) - (isspace(c) ? 0 : 1);
 			s[i] = c;
 			*row += 1;
 			*col = 0;
