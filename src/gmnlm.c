@@ -338,7 +338,7 @@ pipe_resp(FILE *out, struct gemini_response resp, char *cmd) {
 		close(pfd[1]);
 		dup2(pfd[0], STDIN_FILENO);
 		close(pfd[0]);
-		execlp("sh", "sh", "-c", cmd);
+		execlp("sh", "sh", "-c", cmd, NULL);
 		perror("exec");
 		_exit(1);
 	}

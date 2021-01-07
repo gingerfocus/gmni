@@ -124,8 +124,8 @@ callback:
 		struct tm expires_tm;
 		ASN1_TIME_to_tm(notAfter, &expires_tm);
 		time_t expires = mktime(&expires_tm);
-		fprintf(f, "%s %s %s %ld\n", servername,
-			"SHA-512", fingerprint, expires);
+		fprintf(f, "%s %s %s %jd\n", servername,
+			"SHA-512", fingerprint, (intmax_t)expires);
 		fclose(f);
 
 		host = calloc(1, sizeof(struct known_host));
