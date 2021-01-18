@@ -73,7 +73,7 @@ test_cflags() {
 			werror="-Werror"
 			;;
 	esac
-	if $CC $werror "$@" -o /dev/null "$outdir"/check.c >/dev/null 2>&1
+	if $CC $werror "$@" -o "$outdir"/check "$outdir"/check.c >/dev/null 2>&1
 	then
 		append_cflags "$@"
 	else
