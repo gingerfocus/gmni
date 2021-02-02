@@ -73,8 +73,8 @@ const char *help_msg =
 	"q\tQuit\n"
 	"N\tFollow Nth link (where N is a number)\n"
 	"p[N]\tShow URL of Nth link (where N is a number)\n"
-	"b\tBack (in the page history)\n"
-	"f\tForward (in the page history)\n"
+	"b[N]\tJump back N entries in history, N is optional, default 1\n"
+	"f[N]\tJump forward N entries in history, N is optional, default 1\n"
 	"H\tView all page history\n"
 	"m\tSave bookmark\n"
 	"M\tBrowse bookmarks\n"
@@ -500,7 +500,9 @@ do_prompts(const char *prompt, struct browser *browser)
 		goto exit;
 	}
 	in[n - 1] = 0; // Remove LF
+	char *endptr;
 
+	int historyhops = 1;
 	int r;
 	switch (in[0]) {
 	case '\0':
@@ -511,25 +513,28 @@ do_prompts(const char *prompt, struct browser *browser)
 		result = PROMPT_QUIT;
 		goto exit;
 	case 'b':
-		if (in[1]) break;
-		if (!browser->history->prev) {
-			fprintf(stderr, "At beginning of history\n");
-			result = PROMPT_AGAIN;
-			goto exit;
+		if (in[1]) {
+			historyhops =(int)strtol(in+1, &endptr, 10);
 		}
-		if (in[1]) break;
-		browser->history = browser->history->prev;
+		while (historyhops > 0) {
+			if (browser->history->prev) {
+				browser->history = browser->history->prev;
+			}
+			historyhops--;
+		}
 		set_url(browser, browser->history->url, NULL);
 		result = PROMPT_ANSWERED;
 		goto exit;
 	case 'f':
-		if (in[1]) break;
-		if (!browser->history->next) {
-			fprintf(stderr, "At end of history\n");
-			result = PROMPT_AGAIN;
-			goto exit;
+		if (in[1]) {
+			historyhops =(int)strtol(in+1, &endptr, 10);
 		}
-		browser->history = browser->history->next;
+		while (historyhops > 0) {
+			if (browser->history->next) {
+				browser->history = browser->history->next;
+			}
+			historyhops--;
+		}
 		set_url(browser, browser->history->url, NULL);
 		result = PROMPT_ANSWERED;
 		goto exit;
@@ -585,7 +590,6 @@ do_prompts(const char *prompt, struct browser *browser)
 	case 'p':
 		if (!in[1]) break;
 		struct link *link = browser->links;
-		char *endptr;
 		int linksel = (int)strtol(in+1, &endptr, 10);
 		if (!endptr[0] && linksel >= 0) {
 			while (linksel > 0 && link) {
@@ -655,7 +659,6 @@ do_prompts(const char *prompt, struct browser *browser)
 	}
 
 	struct link *link = browser->links;
-	char *endptr;
 	int linksel = (int)strtol(in, &endptr, 10);
 	if ((endptr[0] == '\0' || endptr[0] == '|') && linksel >= 0) {
 		while (linksel > 0 && link) {
