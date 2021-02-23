@@ -1022,7 +1022,7 @@ tofu_callback(enum tofu_error error, const char *fingerprint,
 		free(host);
 		break;
 	case TOFU_FINGERPRINT_MISMATCH:
-		snprintf(prompt, sizeof(prompt),
+		fprintf(browser->tty,
 			"The certificate offered by this server DOES NOT MATCH the one we have on file.\n"
 			"/!\\ Someone may be eavesdropping on or manipulating this connection. /!\\\n"
 			"The unknown certificate's fingerprint is:\n"

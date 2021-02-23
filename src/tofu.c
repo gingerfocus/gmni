@@ -188,6 +188,7 @@ gemini_tofu_init(struct gemini_tofu *tofu,
 		return;
 	}
 	n = 0;
+	int lineno = 1;
 	char *line = NULL;
 	while (getline(&line, &n, f) != -1) {
 		struct known_host *host = calloc(1, sizeof(struct known_host));
@@ -210,6 +211,8 @@ gemini_tofu_init(struct gemini_tofu *tofu,
 		tok = strtok(NULL, " ");
 		assert(tok);
 		host->expires = strtoul(tok, NULL, 10);
+
+		host->lineno = lineno++;
 
 		host->next = tofu->known_hosts;
 		tofu->known_hosts = host;
