@@ -88,7 +88,6 @@ xt_end_chain(const br_x509_class **ctx)
 	}
 
 	enum tofu_error error = TOFU_UNTRUSTED_CERT;
-	(void)error;
 	struct known_host *host = cc->store->known_hosts;
 	while (host) {
 		if (strcmp(host->host, cc->server_name) != 0) {
