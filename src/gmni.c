@@ -1,5 +1,5 @@
 #include <assert.h>
-#include <bearssl_ssl.h>
+#include <bearssl.h>
 #include <errno.h>
 #include <getopt.h>
 #include <netdb.h>
@@ -11,6 +11,7 @@
 #include <sys/types.h>
 #include <termios.h>
 #include <unistd.h>
+#include <gmni/certs.h>
 #include <gmni/gmni.h>
 #include <gmni/tofu.h>
 #include <gmni/url.h>
@@ -109,6 +110,45 @@ tofu_callback(enum tofu_error error, const char *fingerprint,
 	return action;
 }
 
+static struct gmni_client_certificate *
+load_client_cert(char *argv_0, char *path)
+{
+	char *certpath = strtok(path, ":");
+	if (!certpath) {
+		usage(argv_0);
+		exit(1);
+	}
+
+	FILE *certf = fopen(certpath, "r");
+	if (!certf) {
+		fprintf(stderr, "Failed to open certificate: %s\n",
+				strerror(errno));
+		exit(1);
+	}
+
+	char *keypath = strtok(NULL, ":");
+	if (!keypath) {
+		usage(argv_0);
+		exit(1);
+	}
+
+	FILE *keyf = fopen(keypath, "r");
+	if (!keyf) {
+		fprintf(stderr, "Failed to open certificate: %s\n",
+				strerror(errno));
+		exit(1);
+	}
+
+	struct gmni_client_certificate *cert =
+		calloc(1, sizeof(struct gmni_client_certificate));
+	if (gmni_ccert_load(cert, certf, keyf) != 0) {
+		fprintf(stderr, "Failed to load client certificate: %s\n",
+				strerror(errno));
+		exit(1);
+	}
+	return cert;
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -165,7 +205,7 @@ main(int argc, char *argv[])
 			}
 			break;
 		case 'E':
-			assert(0); // TODO: Client certificates
+			opts.client_cert = load_client_cert(argv[0], optarg);
 			break;
 		case 'h':
 			usage(argv[0]);
@@ -226,7 +266,7 @@ main(int argc, char *argv[])
 	bool exit = false;
 	struct Curl_URL *url = curl_url();
 
-	if(curl_url_set(url, CURLUPART_URL, argv[optind], 0) != CURLUE_OK) {
+	if (curl_url_set(url, CURLUPART_URL, argv[optind], 0) != CURLUE_OK) {
 		// TODO: Better error
 		fprintf(stderr, "Error: invalid URL\n");
 		return 1;
@@ -238,8 +278,8 @@ main(int argc, char *argv[])
 		curl_url_get(url, CURLUPART_URL, &buf, 0);
 
 		struct gemini_response resp;
-		enum gemini_result r = gemini_request(
-				buf, &opts, &cfg.tofu, &resp);
+		enum gemini_result r = gemini_request(buf,
+			&opts, &cfg.tofu, &resp);
 
 		free(buf);
 

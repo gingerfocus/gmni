@@ -1,5 +1,5 @@
 #include <assert.h>
-#include <bearssl_ssl.h>
+#include <bearssl.h>
 #include <errno.h>
 #include <gmni/gmni.h>
 #include <libgen.h>

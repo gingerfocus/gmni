@@ -1,6 +1,5 @@
 #include <assert.h>
-#include <bearssl_hash.h>
-#include <bearssl_x509.h>
+#include <bearssl.h>
 #include <errno.h>
 #include <gmni/gmni.h>
 #include <gmni/tofu.h>

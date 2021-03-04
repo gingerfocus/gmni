@@ -1,6 +1,6 @@
 #ifndef GEMINI_CLIENT_H
 #define GEMINI_CLIENT_H
-#include <bearssl_ssl.h>
+#include <bearssl.h>
 #include <netdb.h>
 #include <stdbool.h>
 #include <sys/socket.h>
@@ -61,6 +61,8 @@ struct gemini_response {
 	int fd;
 };
 
+struct gmni_client_certificate;
+
 struct gemini_options {
 	// If ai_family != AF_UNSPEC (the default value on most systems), the
 	// client will connect to this address and skip name resolution.
@@ -69,6 +71,10 @@ struct gemini_options {
 	// If non-NULL, these hints are provided to getaddrinfo. Useful, for
 	// example, to force IPv4/IPv6.
 	struct addrinfo *hints;
+
+	// If non-NULL, this will be used as the client certificate for the
+	// request. The other fields must be set as well.
+	struct gmni_client_certificate *client_cert;
 };
 
 struct gemini_tofu;

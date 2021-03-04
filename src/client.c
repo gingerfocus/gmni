@@ -1,13 +1,14 @@
 #include <assert.h>
 #include <errno.h>
 #include <netdb.h>
-#include <bearssl_ssl.h>
+#include <bearssl.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <gmni/certs.h>
 #include <gmni/gmni.h>
 #include <gmni/tofu.h>
 #include <gmni/url.h>
@@ -169,7 +170,26 @@ gemini_request(const char *url, struct gemini_options *options,
 
 	// TODO: session reuse
 	resp->sc = &tofu->sc;
+	if (options->client_cert) {
+		struct gmni_client_certificate *cert = options->client_cert;
+		struct gmni_private_key *key = cert->key;
+		switch (key->type) {
+		case BR_KEYTYPE_RSA:
+			br_ssl_client_set_single_rsa(resp->sc,
+				cert->chain, cert->nchain, &key->rsa,
+				br_rsa_pkcs1_sign_get_default());
+			break;
+		case BR_KEYTYPE_EC:
+			br_ssl_client_set_single_ec(resp->sc,
+				cert->chain, cert->nchain, &key->ec,
+				BR_KEYTYPE_SIGN, 0,
+				br_ec_get_default(),
+				br_ecdsa_sign_asn1_get_default());
+			break;
+		}
+	}
 	br_ssl_client_reset(resp->sc, host, 0);
+
 	br_sslio_init(&resp->body, &resp->sc->eng,
 		sock_read, &resp->fd, sock_write, &resp->fd);
 

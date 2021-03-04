@@ -38,11 +38,9 @@ performed with the user's input supplied to the server.
 	second request is performed with the contents of _path_ as the user
 	input.
 
-*-E* _path_[:_password_]
-	Sets the path to the client certificate to use (and optionally a
-	password). If the filename contains ":" but the certificate does not
-	accept a password, append ":" to the path and it will be intepreted as
-	an empty password.
+*-E* _path_:_key_
+	Sets the path to the client certificate and private key file to use,
+	both PEM encoded.
 
 *-l*
 	For *text/\** responses, *gmni* normally adds a line feed if stdout is a

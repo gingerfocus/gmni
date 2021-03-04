@@ -1,6 +1,6 @@
 #ifndef GEMINI_TOFU_H
 #define GEMINI_TOFU_H
-#include <bearssl_x509.h>
+#include <bearssl.h>
 #include <limits.h>
 
 enum tofu_error {
