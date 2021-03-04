@@ -1,15 +1,15 @@
 #include <assert.h>
 #include <errno.h>
 #include <netdb.h>
-#include <openssl/bio.h>
-#include <openssl/err.h>
-#include <openssl/ssl.h>
+#include <bearssl_ssl.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <unistd.h>
 #include <gmni/gmni.h>
+#include <gmni/tofu.h>
 #include <gmni/url.h>
 
 static enum gemini_result
@@ -88,9 +88,41 @@ gemini_connect(struct Curl_URL *uri, struct gemini_options *options,
 #define GEMINI_META_MAXLEN 1024
 #define GEMINI_STATUS_MAXLEN 2
 
+static int
+sock_read(void *ctx, unsigned char *buf, size_t len)
+{
+	for (;;) {
+		ssize_t rlen;
+		rlen = read(*(int *)ctx, buf, len);
+		if (rlen <= 0) {
+			if (rlen < 0 && errno == EINTR) {
+				continue;
+			}
+			return -1;
+		}
+		return (int)rlen;
+	}
+}
+
+static int
+sock_write(void *ctx, const unsigned char *buf, size_t len)
+{
+	for (;;) {
+		ssize_t wlen;
+		wlen = write(*(int *)ctx, buf, len);
+		if (wlen <= 0) {
+			if (wlen < 0 && errno == EINTR) {
+				continue;
+			}
+			return -1;
+		}
+		return (int)wlen;
+	}
+}
+
 enum gemini_result
 gemini_request(const char *url, struct gemini_options *options,
-		struct gemini_response *resp)
+		struct gemini_tofu *tofu, struct gemini_response *resp)
 {
 	assert(url);
 	assert(resp);
@@ -128,84 +160,50 @@ gemini_request(const char *url, struct gemini_options *options,
 		goto cleanup;
 	}
 
-	if (options && options->ssl_ctx) {
-		resp->ssl_ctx = options->ssl_ctx;
-		SSL_CTX_up_ref(options->ssl_ctx);
-	} else {
-		resp->ssl_ctx = SSL_CTX_new(TLS_method());
-		assert(resp->ssl_ctx);
-		SSL_CTX_set_verify(resp->ssl_ctx, SSL_VERIFY_PEER, NULL);
-	}
-
 	int r;
-	BIO *sbio = BIO_new(BIO_f_ssl());
 	res = gemini_connect(uri, options, resp, &resp->fd);
 	if (res != GEMINI_OK) {
 		free(host);
 		goto cleanup;
 	}
 
-	resp->ssl = SSL_new(resp->ssl_ctx);
-	assert(resp->ssl);
-	SSL_set_connect_state(resp->ssl);
-	if ((r = SSL_set1_host(resp->ssl, host)) != 1) {
-		free(host);
-		goto ssl_error;
-	}
-	if ((r = SSL_set_tlsext_host_name(resp->ssl, host)) != 1) {
-		free(host);
-		goto ssl_error;
-	}
-	free(host);
-	if ((r = SSL_set_fd(resp->ssl, resp->fd)) != 1) {
-		goto ssl_error;
-	}
-	if ((r = SSL_connect(resp->ssl)) != 1) {
-		goto ssl_error;
-	}
-
-	X509 *cert = SSL_get_peer_certificate(resp->ssl);
-	if (!cert) {
-		resp->status = X509_V_ERR_UNSPECIFIED;
-		res = GEMINI_ERR_SSL_VERIFY;
-		goto cleanup;
-	}
-	X509_free(cert);
-
-	long vr = SSL_get_verify_result(resp->ssl);
-	if (vr != X509_V_OK) {
-		resp->status = vr;
-		res = GEMINI_ERR_SSL_VERIFY;
-		goto cleanup;
-	}
-
-	BIO_set_ssl(sbio, resp->ssl, 0);
-
-	resp->bio = BIO_new(BIO_f_buffer());
-	BIO_push(resp->bio, sbio);
+	// TODO: session reuse
+	resp->sc = &tofu->sc;
+	br_ssl_client_reset(resp->sc, host, 0);
+	br_sslio_init(&resp->body, &resp->sc->eng,
+		sock_read, &resp->fd, sock_write, &resp->fd);
 
 	char req[1024 + 3];
 	r = snprintf(req, sizeof(req), "%s\r\n", url);
 	assert(r > 0);
 
-	r = BIO_puts(sbio, req);
-	if (r == -1) {
-		res = GEMINI_ERR_IO;
-		goto cleanup;
-	}
-	assert(r == (int)strlen(req));
+	br_sslio_write_all(&resp->body, req, r);
+	br_sslio_flush(&resp->body);
 
+	// The SSL engine maintains an internal buffer, so this shouldn't be as
+	// inefficient as it looks. It's necessary to do this one byte at a time
+	// to avoid consuming any of the response body buffer.
 	char buf[GEMINI_META_MAXLEN
 		+ GEMINI_STATUS_MAXLEN
 		+ 2 /* CRLF */ + 1 /* NUL */];
-	r = BIO_gets(resp->bio, buf, sizeof(buf));
-	if (r == -1) {
-		res = GEMINI_ERR_IO;
-		goto cleanup;
+	memset(buf, 0, sizeof(buf));
+	size_t l;
+	for (l = 0; l < 2 || memcmp(&buf[l-2], "\r\n", 2) != 0; ++l) {
+		r = br_sslio_read(&resp->body, &buf[l], 1);
+		if (r < 0) {
+			break;
+		}
 	}
 
-	if (r < 3 || strcmp(&buf[r - 2], "\r\n") != 0) {
-		fprintf(stderr, "invalid line %d '%s'\n", r, buf);
+	int err = br_ssl_engine_last_error(&resp->sc->eng);
+	if (err != 0) {
+		// TODO: Bubble this up properly
+		fprintf(stderr, "SSL error %d\n", err);
+		goto ssl_error;
+	}
+
+	if (l < 3 || strcmp(&buf[l-2], "\r\n") != 0) {
+		fprintf(stderr, "invalid line '%s'\n", buf);
 		res = GEMINI_ERR_PROTOCOL;
 		goto cleanup;
 	}
@@ -217,9 +215,9 @@ gemini_request(const char *url, struct gemini_options *options,
 		res = GEMINI_ERR_PROTOCOL;
 		goto cleanup;
 	}
-	resp->meta = calloc(r - 5 /* 2 digits, space, and CRLF */ + 1 /* NUL */, 1);
-	strncpy(resp->meta, &endptr[1], r - 5);
-	resp->meta[r - 5] = '\0';
+	resp->meta = calloc(l - 5 /* 2 digits, space, and CRLF */ + 1 /* NUL */, 1);
+	strncpy(resp->meta, &endptr[1], l - 5);
+	resp->meta[l - 5] = '\0';
 
 cleanup:
 	curl_url_cleanup(uri);
@@ -237,26 +235,18 @@ gemini_response_finish(struct gemini_response *resp)
 		return;
 	}
 
-	if (resp->bio) {
-		BIO_free_all(resp->bio);
-		resp->bio = NULL;
-	}
-
-	if (resp->ssl) {
-		SSL_free(resp->ssl);
-	}
-	if (resp->ssl_ctx) {
-		SSL_CTX_free(resp->ssl_ctx);
-	}
-	free(resp->meta);
-
 	if (resp->fd != -1) {
 		close(resp->fd);
 		resp->fd = -1;
 	}
 
-	resp->ssl = NULL;
-	resp->ssl_ctx = NULL;
+	free(resp->meta);
+
+	if (resp->sc) {
+		br_sslio_close(&resp->body);
+	}
+
+	resp->sc = NULL;
 	resp->meta = NULL;
 }
 
@@ -277,11 +267,11 @@ gemini_strerr(enum gemini_result r, struct gemini_response *resp)
 	case GEMINI_ERR_CONNECT:
 		return strerror(errno);
 	case GEMINI_ERR_SSL:
-		return ERR_error_string(
-			SSL_get_error(resp->ssl, resp->status),
-			NULL);
+		// TODO: more specific
+		return "SSL error";
 	case GEMINI_ERR_SSL_VERIFY:
-		return X509_verify_cert_error_string(resp->status);
+		// TODO: more specific
+		return "X.509 certificate not trusted";
 	case GEMINI_ERR_IO:
 		return "I/O error";
 	case GEMINI_ERR_PROTOCOL:

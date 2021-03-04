@@ -1,5 +1,7 @@
 #include <assert.h>
+#include <bearssl_ssl.h>
 #include <errno.h>
+#include <gmni/gmni.h>
 #include <libgen.h>
 #include <limits.h>
 #include <stdint.h>
@@ -7,7 +9,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
-#include <gmni/gmni.h>
 #include "util.h"
 
 static void
@@ -82,7 +83,7 @@ download_resp(FILE *out, struct gemini_response resp, const char *path,
 	fprintf(out, "Downloading %s to %s\n", url, path);
 	char buf[BUFSIZ];
 	for (int n = 1; n > 0;) {
-		n = BIO_read(resp.bio, buf, sizeof(buf));
+		n = br_sslio_read(&resp.body, buf, sizeof(buf));
 		if (n == -1) {
 			fprintf(stderr, "Error: read\n");
 			return 1;

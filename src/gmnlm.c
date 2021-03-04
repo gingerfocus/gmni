@@ -1,22 +1,25 @@
 #include <assert.h>
+#include <bearssl_ssl.h>
 #include <ctype.h>
+#include <errno.h>
+#include <fcntl.h>
 #include <getopt.h>
-#include <libgen.h>
-#include <limits.h>
-#include <openssl/bio.h>
-#include <openssl/err.h>
-#include <regex.h>
-#include <stdbool.h>
-#include <stdio.h>
-#include <string.h>
-#include <sys/ioctl.h>
-#include <sys/stat.h>
-#include <sys/wait.h>
-#include <termios.h>
-#include <unistd.h>
 #include <gmni/gmni.h>
 #include <gmni/tofu.h>
 #include <gmni/url.h>
+#include <libgen.h>
+#include <limits.h>
+#include <regex.h>
+#include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/ioctl.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <termios.h>
+#include <unistd.h>
 #include "util.h"
 
 struct link {
@@ -346,10 +349,13 @@ pipe_resp(FILE *out, struct gemini_response resp, char *cmd) {
 	FILE *f = fdopen(pfd[1], "w");
 	// XXX: may affect history, do we care?
 	for (int n = 1; n > 0;) {
-		n = BIO_read(resp.bio, buf, BUFSIZ);
-		if (n == -1) {
-			fprintf(stderr, "Error: read\n");
-			return;
+		if (resp.sc) {
+			n = br_sslio_read(&resp.body, buf, BUFSIZ);
+		} else {
+			n = read(resp.fd, buf, BUFSIZ);
+		}
+		if (n < 0) {
+			n = 0;
 		}
 		ssize_t w = 0;
 		while (w < (ssize_t)n) {
@@ -393,23 +399,19 @@ do_requests(struct browser *browser, struct gemini_response *resp)
 				break;
 			}
 
-			FILE *fp = fopen(path, "r");
-			if (!fp) {
+			int fd = open(path, O_RDONLY);
+			if (fd < 0) {
 				resp->status = GEMINI_STATUS_NOT_FOUND;
-				/* Make sure members of resp evaluate to false, so that
-					gemini_response_finish does not try to free them. */
-				resp->bio = NULL;
-				resp->ssl = NULL;
-				resp->ssl_ctx = NULL;
+				// Make sure members of resp evaluate to false,
+				// so that gemini_response_finish does not try
+				// to free them.
+				resp->sc = NULL;
 				resp->meta = NULL;
 				resp->fd = -1;
 				free(path);
 				break;
 			}
 
-			BIO *file = BIO_new_fp(fp, BIO_CLOSE);
-			resp->bio = BIO_new(BIO_f_buffer());
-			BIO_push(resp->bio, file);
 			if (has_suffix(path, ".gmi") || has_suffix(path, ".gemini")) {
 				resp->meta = strdup("text/gemini");
 			} else if (has_suffix(path, ".txt")) {
@@ -419,14 +421,14 @@ do_requests(struct browser *browser, struct gemini_response *resp)
 			}
 			free(path);
 			resp->status = GEMINI_STATUS_SUCCESS;
-			resp->fd = -1;
-			resp->ssl = NULL;
-			resp->ssl_ctx = NULL;
+			resp->fd = fd;
+			resp->sc = NULL;
 			return GEMINI_OK;
 		}
 		free(scheme);
 
-		res = gemini_request(browser->plain_url, &browser->opts, resp);
+		res = gemini_request(browser->plain_url, &browser->opts,
+				&browser->tofu, resp);
 		if (res != GEMINI_OK) {
 			fprintf(stderr, "Error: %s\n", gemini_strerr(res, resp));
 			requesting = false;
@@ -752,12 +754,23 @@ wrap(FILE *f, char *s, struct winsize *ws, int *row, int *col)
 	return fprintf(f, "%s\n", s) - 1;
 }
 
+static int
+resp_read(void *state, void *buf, size_t nbyte)
+{
+	struct gemini_response *resp = state;
+	if (resp->sc) {
+		return br_sslio_read(&resp->body, buf, nbyte);
+	} else {
+		return read(resp->fd, buf, nbyte);
+	}
+}
+
 static bool
 display_gemini(struct browser *browser, struct gemini_response *resp)
 {
 	int nlinks = 0;
 	struct gemini_parser p;
-	gemini_parser_init(&p, resp->bio);
+	gemini_parser_init(&p, &resp_read, resp);
 	free(browser->page_title);
 	browser->page_title = NULL;
 
@@ -945,10 +958,13 @@ display_plaintext(struct browser *browser, struct gemini_response *resp)
 
 	char buf[BUFSIZ];
 	for (int n = 1; n > 0;) {
-		n = BIO_read(resp->bio, buf, BUFSIZ);
-		if (n == -1) {
-			fprintf(stderr, "Error: read\n");
-			return 1;
+		if (resp->sc) {
+			n = br_sslio_read(&resp->body, buf, BUFSIZ);
+		} else {
+			n = read(resp->fd, buf, BUFSIZ);
+		}
+		if (n < 0) {
+			n = 0;
 		}
 		ssize_t w = 0;
 		while (w < (ssize_t)n) {
@@ -1123,11 +1139,7 @@ main(int argc, char *argv[])
 		open_bookmarks(&browser);
 	}
 
-	SSL_load_error_strings();
-	ERR_load_crypto_strings();
-	browser.opts.ssl_ctx = SSL_CTX_new(TLS_method());
-	gemini_tofu_init(&browser.tofu, browser.opts.ssl_ctx,
-			&tofu_callback, &browser);
+	gemini_tofu_init(&browser.tofu, &tofu_callback, &browser);
 
 	struct gemini_response resp;
 	browser.running = true;
@@ -1189,7 +1201,6 @@ main(int argc, char *argv[])
 		hist = hist->prev;
 	}
 	history_free(hist);
-	SSL_CTX_free(browser.opts.ssl_ctx);
 	curl_url_cleanup(browser.url);
 	free(browser.page_title);
 	free(browser.plain_url);

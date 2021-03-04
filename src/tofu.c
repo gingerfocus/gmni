@@ -1,95 +1,97 @@
 #include <assert.h>
+#include <bearssl_hash.h>
+#include <bearssl_x509.h>
 #include <errno.h>
-#include <libgen.h>
-#include <limits.h>
-#include <openssl/asn1.h>
-#include <openssl/evp.h>
-#include <openssl/ssl.h>
-#include <openssl/x509.h>
-#include <openssl/x509v3.h>
-#include <stdio.h>
-#include <string.h>
-#include <time.h>
 #include <gmni/gmni.h>
 #include <gmni/tofu.h>
+#include <libgen.h>
+#include <limits.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include "util.h"
 
-static int
-verify_callback(X509_STORE_CTX *ctx, void *data)
+static void
+xt_start_chain(const br_x509_class **ctx, const char *server_name)
 {
-	// Gemini clients handle TLS verification differently from the rest of
-	// the internet. We use a TOFU system, so trust is based on two factors:
-	//
-	// - Is the certificate valid at the time of the request?
-	// - Has the user trusted this certificate yet?
-	//
-	// If the answer to the latter is "no", then we give the user an
-	// opportunity to explicitly agree to trust the certificate before
-	// rejecting it.
-	//
-	// If you're reading this code with the intent to re-use it for
-	// something unrelated to Gemini, think twice.
-	struct gemini_tofu *tofu = (struct gemini_tofu *)data;
-	X509 *cert = X509_STORE_CTX_get0_cert(ctx);
-	struct known_host *host = NULL;
+	struct x509_tofu_context *cc = (struct x509_tofu_context *)(void *)ctx;
+	cc->server_name = server_name;
+	cc->err = 0;
+	cc->pkey = NULL;
+}
 
-	int rc;
-	int day, sec;
-	const ASN1_TIME *notBefore = X509_get0_notBefore(cert);
-	const ASN1_TIME *notAfter = X509_get0_notAfter(cert);
-	if (!ASN1_TIME_diff(&day, &sec, NULL, notBefore)) {
-		rc = X509_V_ERR_UNSPECIFIED;
-		goto invalid_cert;
+static void
+xt_start_cert(const br_x509_class **ctx, uint32_t length)
+{
+	struct x509_tofu_context *cc = (struct x509_tofu_context *)(void *)ctx;
+	if (cc->err != 0) {
+		return;
 	}
-	if (day > 0 || sec > 0) {
-		rc = X509_V_ERR_CERT_NOT_YET_VALID;
-		goto invalid_cert;
+	if (length == 0) {
+		cc->err = BR_ERR_X509_TRUNCATED;
+		return;
 	}
-	if (!ASN1_TIME_diff(&day, &sec, NULL, notAfter)) {
-		rc = X509_V_ERR_UNSPECIFIED;
-		goto invalid_cert;
-	}
-	if (day < 0 || sec < 0) {
-		rc = X509_V_ERR_CERT_HAS_EXPIRED;
-		goto invalid_cert;
-	}
+	br_x509_decoder_init(&cc->decoder, NULL, NULL);
+	br_sha512_init(&cc->sha512);
+}
 
-	unsigned char md[512 / 8];
-	const EVP_MD *sha512 = EVP_sha512();
-	unsigned int len = sizeof(md);
-	rc = X509_digest(cert, sha512, md, &len);
-	assert(rc == 1);
+static void
+xt_append(const br_x509_class **ctx, const unsigned char *buf, size_t len)
+{
+	struct x509_tofu_context *cc = (struct x509_tofu_context *)(void *)ctx;
+	if (cc->err != 0) {
+		return;
+	}
+	br_x509_decoder_push(&cc->decoder, buf, len);
+	int err = br_x509_decoder_last_error(&cc->decoder);
+	if (err != 0 && err != BR_ERR_X509_TRUNCATED) {
+		cc->err = err;
+	}
+	br_sha512_update(&cc->sha512, buf, len);
+}
+
+static void
+xt_end_cert(const br_x509_class **ctx)
+{
+	struct x509_tofu_context *cc = (struct x509_tofu_context *)(void *)ctx;
+	if (cc->err != 0) {
+		return;
+	}
+	int err = br_x509_decoder_last_error(&cc->decoder);
+	if (err != 0 && err != BR_ERR_X509_TRUNCATED) {
+		cc->err = err;
+		return;
+	}
+	if (br_x509_decoder_isCA(&cc->decoder)) {
+		return;
+	}
+	cc->pkey = br_x509_decoder_get_pkey(&cc->decoder);
+	br_sha512_out(&cc->sha512, &cc->hash);
+}
+
+static unsigned
+xt_end_chain(const br_x509_class **ctx)
+{
+	struct x509_tofu_context *cc = (struct x509_tofu_context *)(void *)ctx;
+	if (cc->err != 0) {
+		return (unsigned)cc->err;
+	}
+	if (!cc->pkey) {
+		return BR_ERR_X509_EMPTY_CHAIN;
+	}
 
 	char fingerprint[512 / 8 * 3];
-	for (size_t i = 0; i < sizeof(md); ++i) {
+	for (size_t i = 0; i < sizeof(cc->hash); ++i) {
 		snprintf(&fingerprint[i * 3], 4, "%02X%s",
-			md[i], i + 1 == sizeof(md) ? "" : ":");
+			cc->hash[i], i + 1 == sizeof(cc->hash) ? "" : ":");
 	}
-
-	SSL *ssl = X509_STORE_CTX_get_ex_data(ctx,
-		SSL_get_ex_data_X509_STORE_CTX_idx());
-	const char *servername = SSL_get_servername(ssl, TLSEXT_NAMETYPE_host_name);
-	if (!servername) {
-		rc = X509_V_ERR_HOSTNAME_MISMATCH;
-		goto invalid_cert;
-	}
-
-	rc = X509_check_host(cert, servername, strlen(servername), 0, NULL);
-	if (rc != 1) {
-		rc = X509_V_ERR_HOSTNAME_MISMATCH;
-		goto invalid_cert;
-	}
-
-	time_t now;
-	time(&now);
 
 	enum tofu_error error = TOFU_UNTRUSTED_CERT;
-	host = tofu->known_hosts;
+	(void)error;
+	struct known_host *host = cc->store->known_hosts;
 	while (host) {
-		if (host->expires < now) {
-			goto next;
-		}
-		if (strcmp(host->host, servername) != 0) {
+		if (strcmp(host->host, cc->server_name) != 0) {
 			goto next;
 		}
 		if (strcmp(host->fingerprint, fingerprint) == 0) {
@@ -102,66 +104,84 @@ next:
 		host = host->next;
 	}
 
-	rc = X509_V_ERR_CERT_UNTRUSTED;
-	
-callback:
-	switch (tofu->callback(error, fingerprint, host, tofu->cb_data)) {
+	switch (cc->store->callback(error, fingerprint,
+				host, cc->store->cb_data)) {
 	case TOFU_ASK:
 		assert(0); // Invariant
 	case TOFU_FAIL:
-		X509_STORE_CTX_set_error(ctx, rc);
-		break;
+		return BR_ERR_X509_NOT_TRUSTED;
 	case TOFU_TRUST_ONCE:
 		// No further action necessary
 		return 0;
 	case TOFU_TRUST_ALWAYS:;
-		FILE *f = fopen(tofu->known_hosts_path, "a");
+		FILE *f = fopen(cc->store->known_hosts_path, "a");
 		if (!f) {
 			fprintf(stderr, "Error opening %s for writing: %s\n",
-				tofu->known_hosts_path, strerror(errno));
+				cc->store->known_hosts_path, strerror(errno));
 			break;
 		};
-		struct tm expires_tm;
-		ASN1_TIME_to_tm(notAfter, &expires_tm);
-		time_t expires = mktime(&expires_tm);
-		fprintf(f, "%s %s %s %jd\n", servername,
-			"SHA-512", fingerprint, (intmax_t)expires);
+		fprintf(f, "%s %s %s\n", cc->server_name,
+				"SHA-512", fingerprint);
 		fclose(f);
 
 		host = calloc(1, sizeof(struct known_host));
-		host->host = strdup(servername);
+		host->host = strdup(cc->server_name);
 		host->fingerprint = strdup(fingerprint);
-		host->expires = expires;
-		host->lineno = ++tofu->lineno;
-		host->next = tofu->known_hosts;
-		tofu->known_hosts = host;
+		host->lineno = ++cc->store->lineno;
+		host->next = cc->store->known_hosts;
+		cc->store->known_hosts = host;
 		return 0;
 	}
 
-	X509_STORE_CTX_set_error(ctx, rc);
-	return 0;
-
-invalid_cert:
-	error = TOFU_INVALID_CERT;
-	goto callback;
+	assert(0); // Unreachable
 }
 
+static const br_x509_pkey *
+xt_get_pkey(const br_x509_class *const *ctx, unsigned *usages)
+{
+	struct x509_tofu_context *cc = (struct x509_tofu_context *)(void *)ctx;
+	if (cc->err != 0) {
+		return NULL;
+	}
+	if (usages) {
+		// XXX: BearSSL doesn't pull the usages out of the X.509 for us
+		*usages = BR_KEYTYPE_KEYX | BR_KEYTYPE_SIGN;
+	}
+	return cc->pkey;
+}
+
+const br_x509_class xt_vtable = {
+	sizeof(struct x509_tofu_context),
+	xt_start_chain,
+	xt_start_cert,
+	xt_append,
+	xt_end_cert,
+	xt_end_chain,
+	xt_get_pkey,
+};
+
+static void
+x509_init_tofu(struct x509_tofu_context *ctx, struct gemini_tofu *store)
+{
+	ctx->vtable = &xt_vtable;
+	ctx->store = store;
+}
 
 void
-gemini_tofu_init(struct gemini_tofu *tofu,
-	SSL_CTX *ssl_ctx, tofu_callback_t *cb, void *cb_data)
+gemini_tofu_init(struct gemini_tofu *tofu, tofu_callback_t *cb, void *cb_data)
 {
 	const struct pathspec paths[] = {
 		{.var = "GMNIDATA", .path = "/%s"},
-		{.var = "XDG_DATA_HOME", .path = "/gemini/%s"},
-		{.var = "HOME", .path = "/.local/share/gemini/%s"}
+		{.var = "XDG_DATA_HOME", .path = "/gmni/%s"},
+		{.var = "HOME", .path = "/.local/share/gmni/%s"}
 	};
 	char *path_fmt = getpath(paths, sizeof(paths) / sizeof(paths[0]));
 	char dname[PATH_MAX+1];
 	size_t n = 0;
 
-	n = snprintf(tofu->known_hosts_path, sizeof(tofu->known_hosts_path),
-			path_fmt, "known_hosts");
+	n = snprintf(tofu->known_hosts_path,
+		sizeof(tofu->known_hosts_path),
+		path_fmt, "known_hosts");
 	assert(n < sizeof(tofu->known_hosts_path));
 
 	strncpy(dname, dirname(tofu->known_hosts_path), sizeof(dname)-1);
@@ -179,9 +199,16 @@ gemini_tofu_init(struct gemini_tofu *tofu,
 
 	tofu->callback = cb;
 	tofu->cb_data = cb_data;
-	SSL_CTX_set_cert_verify_callback(ssl_ctx, verify_callback, tofu);
 
 	tofu->known_hosts = NULL;
+
+	x509_init_tofu(&tofu->x509_ctx, tofu);
+
+	br_x509_minimal_context _; // Discarded
+	br_ssl_client_init_full(&tofu->sc, &_, NULL, 0);
+	br_ssl_engine_set_x509(&tofu->sc.eng, &tofu->x509_ctx.vtable);
+	br_ssl_engine_set_buffer(&tofu->sc.eng,
+			&tofu->iobuf, sizeof(tofu->iobuf), 1);
 
 	FILE *f = fopen(tofu->known_hosts_path, "r");
 	if (!f) {
@@ -191,6 +218,11 @@ gemini_tofu_init(struct gemini_tofu *tofu,
 	int lineno = 1;
 	char *line = NULL;
 	while (getline(&line, &n, f) != -1) {
+		int ln = strlen(line);
+		if (line[ln-1] == '\n') {
+			line[ln-1] = 0;
+		}
+
 		struct known_host *host = calloc(1, sizeof(struct known_host));
 		char *tok = strtok(line, " ");
 		assert(tok);
@@ -207,10 +239,6 @@ gemini_tofu_init(struct gemini_tofu *tofu,
 		tok = strtok(NULL, " ");
 		assert(tok);
 		host->fingerprint = strdup(tok);
-
-		tok = strtok(NULL, " ");
-		assert(tok);
-		host->expires = strtoul(tok, NULL, 10);
 
 		host->lineno = lineno++;
 

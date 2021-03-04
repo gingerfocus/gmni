@@ -1,9 +1,7 @@
 #ifndef GEMINI_TOFU_H
 #define GEMINI_TOFU_H
+#include <bearssl_x509.h>
 #include <limits.h>
-#include <openssl/ssl.h>
-#include <openssl/x509.h>
-#include <time.h>
 
 enum tofu_error {
 	TOFU_VALID,
@@ -24,7 +22,6 @@ enum tofu_action {
 
 struct known_host {
 	char *host, *fingerprint;
-	time_t expires;
 	int lineno;
 	struct known_host *next;
 };
@@ -34,7 +31,23 @@ struct known_host {
 typedef enum tofu_action (tofu_callback_t)(enum tofu_error error,
 	const char *fingerprint, struct known_host *host, void *data);
 
+struct gemini_tofu;
+
+struct x509_tofu_context {
+	const br_x509_class *vtable;
+	br_x509_decoder_context decoder;
+	br_x509_pkey *pkey;
+	br_sha512_context sha512;
+	unsigned char hash[64];
+	struct gemini_tofu *store;
+	const char *server_name;
+	int err;
+};
+
 struct gemini_tofu {
+	struct x509_tofu_context x509_ctx;
+	br_ssl_client_context sc;
+	unsigned char iobuf[BR_SSL_BUFSIZE_BIDI];
 	char known_hosts_path[PATH_MAX+1];
 	struct known_host *known_hosts;
 	int lineno;
@@ -42,8 +55,7 @@ struct gemini_tofu {
 	void *cb_data;
 };
 
-void gemini_tofu_init(struct gemini_tofu *tofu,
-		SSL_CTX *ssl_ctx, tofu_callback_t *cb, void *data);
+void gemini_tofu_init(struct gemini_tofu *tofu, tofu_callback_t *cb, void *data);
 void gemini_tofu_finish(struct gemini_tofu *tofu);
 
 #endif

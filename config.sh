@@ -117,8 +117,8 @@ run_configure() {
 		fi
 	done
 
-	find_library OpenSSL libssl
-	find_library OpenSSL libcrypto
+	# XXX: Asked the maintainer to provide a .pc file
+	LIBS="$LIBS -lbearssl"
 
 	printf "Checking for scdoc... "
 	if scdoc -v >/dev/null 2>&1

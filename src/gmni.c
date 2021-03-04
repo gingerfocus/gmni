@@ -1,9 +1,8 @@
 #include <assert.h>
+#include <bearssl_ssl.h>
 #include <errno.h>
 #include <getopt.h>
 #include <netdb.h>
-#include <openssl/bio.h>
-#include <openssl/err.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -222,10 +221,7 @@ main(int argc, char *argv[])
 		return 1;
 	}
 
-	SSL_load_error_strings();
-	ERR_load_crypto_strings();
-	opts.ssl_ctx = SSL_CTX_new(TLS_method());
-	gemini_tofu_init(&cfg.tofu, opts.ssl_ctx, &tofu_callback, &cfg);
+	gemini_tofu_init(&cfg.tofu, &tofu_callback, &cfg);
 
 	bool exit = false;
 	struct Curl_URL *url = curl_url();
@@ -242,7 +238,8 @@ main(int argc, char *argv[])
 		curl_url_get(url, CURLUPART_URL, &buf, 0);
 
 		struct gemini_response resp;
-		enum gemini_result r = gemini_request(buf, &opts, &resp);
+		enum gemini_result r = gemini_request(
+				buf, &opts, &cfg.tofu, &resp);
 
 		free(buf);
 
@@ -340,11 +337,8 @@ main(int argc, char *argv[])
 			char last = 0;
 			char buf[BUFSIZ];
 			for (int n = 1; n > 0;) {
-				n = BIO_read(resp.bio, buf, BUFSIZ);
-				if (n == -1) {
-					fprintf(stderr, "Error: read\n");
-					return 1;
-				} else if (n != 0) {
+				n = br_sslio_read(&resp.body, buf, BUFSIZ);
+				if (n > 0) {
 					last = buf[n - 1];
 				}
 				ssize_t w = 0;
@@ -370,7 +364,6 @@ next:
 		gemini_response_finish(&resp);
 	}
 
-	SSL_CTX_free(opts.ssl_ctx);
 	curl_url_cleanup(url);
 	gemini_tofu_finish(&cfg.tofu);
 	return ret;

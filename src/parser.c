@@ -1,21 +1,23 @@
 #include <assert.h>
 #include <ctype.h>
-#include <openssl/bio.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <gmni/gmni.h>
 
 void
-gemini_parser_init(struct gemini_parser *p, BIO *f)
+gemini_parser_init(struct gemini_parser *p,
+	int (*read)(void *state, void *buf, size_t nbyte),
+	void *state)
 {
-	p->f = f;
+	p->read = read;
+	p->state = state;
 	p->bufln = 0;
 	p->bufsz = BUFSIZ;
 	p->buf = malloc(p->bufsz + 1);
 	p->buf[0] = 0;
-	BIO_up_ref(p->f);
 	p->preformatted = false;
 }
 
@@ -25,7 +27,6 @@ gemini_parser_finish(struct gemini_parser *p)
 	if (!p) {
 		return;
 	}
-	BIO_free(p->f);
 	free(p->buf);
 }
 
@@ -42,7 +43,7 @@ gemini_parser_next(struct gemini_parser *p, struct gemini_token *tok)
 			assert(p->buf);
 		}
 
-		ssize_t n = BIO_read(p->f, &p->buf[p->bufln], p->bufsz - p->bufln - 1);
+		int n = p->read(p->state, &p->buf[p->bufln], p->bufsz - p->bufln - 1);
 		if (n == -1) {
 			return -1;
 		} else if (n == 0) {

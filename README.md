@@ -8,7 +8,7 @@ This is a [Gemini](https://gemini.circumlunar.space/) client. Included are:
 Dependencies:
 
 - A POSIX-like system and a C11 compiler
-- OpenSSL
+- [BearSSL](https://www.bearssl.org/index.html)
 - [scdoc](https://sr.ht/~sircmpwn/scdoc/) (optional)
 
 Features:

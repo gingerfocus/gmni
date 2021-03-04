@@ -1,5 +1,7 @@
 #ifndef GEMINI_UTIL_H
 #define GEMINI_UTIL_H
+#include <stdio.h>
+#include <sys/types.h>
 
 struct pathspec {
 	const char *var;

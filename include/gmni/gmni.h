@@ -1,7 +1,7 @@
 #ifndef GEMINI_CLIENT_H
 #define GEMINI_CLIENT_H
+#include <bearssl_ssl.h>
 #include <netdb.h>
-#include <openssl/ssl.h>
 #include <stdbool.h>
 #include <sys/socket.h>
 
@@ -52,20 +52,16 @@ struct gemini_response {
 	enum gemini_status status;
 	char *meta;
 
+	// TODO: Make these private
 	// Response body may be read from here if appropriate:
-	BIO *bio;
+	br_sslio_context body;
 
 	// Connection state
-	SSL_CTX *ssl_ctx;
-	SSL *ssl;
+	br_ssl_client_context *sc;
 	int fd;
 };
 
 struct gemini_options {
-	// If NULL, an SSL context will be created. If unset, the ssl field
-	// must also be NULL.
-	SSL_CTX *ssl_ctx;
-
 	// If ai_family != AF_UNSPEC (the default value on most systems), the
 	// client will connect to this address and skip name resolution.
 	struct addrinfo *addr;
@@ -74,6 +70,8 @@ struct gemini_options {
 	// example, to force IPv4/IPv6.
 	struct addrinfo *hints;
 };
+
+struct gemini_tofu;
 
 // Requests the specified URL via the gemini protocol. If options is non-NULL,
 // it may specify some additional configuration to adjust client behavior.
@@ -84,6 +82,7 @@ struct gemini_options {
 // before exiting or re-using it for another request.
 enum gemini_result gemini_request(const char *url,
 		struct gemini_options *options,
+		struct gemini_tofu *tofu,
 		struct gemini_response *resp);
 
 // Must be called after gemini_request in order to free up the resources
@@ -137,15 +136,20 @@ struct gemini_token {
 };
 
 struct gemini_parser {
-	BIO *f;
+	int (*read)(void *state, void *buf, size_t nbyte);
+	void *state;
 	char *buf;
 	size_t bufsz;
 	size_t bufln;
 	bool preformatted;
 };
 
-// Initializes a text/gemini parser which reads from the specified BIO.
-void gemini_parser_init(struct gemini_parser *p, BIO *f);
+// Initializes a text/gemini parser. The provided "read" function will be called
+// with the provided "state" value in order to obtain more gemtext data. The
+// read function should behave like read(3).
+void gemini_parser_init(struct gemini_parser *p,
+		int (*read)(void *state, void *buf, size_t nbyte),
+		void *state);
 
 // Finishes this text/gemini parser and frees up its resources.
 void gemini_parser_finish(struct gemini_parser *p);
