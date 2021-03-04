@@ -25,7 +25,7 @@ static void
 xt_start_cert(const br_x509_class **ctx, uint32_t length)
 {
 	struct x509_tofu_context *cc = (struct x509_tofu_context *)(void *)ctx;
-	if (cc->err != 0) {
+	if (cc->err != 0 || cc->pkey) {
 		return;
 	}
 	if (length == 0) {
@@ -40,7 +40,7 @@ static void
 xt_append(const br_x509_class **ctx, const unsigned char *buf, size_t len)
 {
 	struct x509_tofu_context *cc = (struct x509_tofu_context *)(void *)ctx;
-	if (cc->err != 0) {
+	if (cc->err != 0 || cc->pkey) {
 		return;
 	}
 	br_x509_decoder_push(&cc->decoder, buf, len);
@@ -63,7 +63,7 @@ xt_end_cert(const br_x509_class **ctx)
 		cc->err = err;
 		return;
 	}
-	if (br_x509_decoder_isCA(&cc->decoder) && cc->pkey) {
+	if (br_x509_decoder_isCA(&cc->decoder)) {
 		return;
 	}
 	cc->pkey = br_x509_decoder_get_pkey(&cc->decoder);
