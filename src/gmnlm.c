@@ -4,6 +4,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <getopt.h>
+#include <gmni/certs.h>
 #include <gmni/gmni.h>
 #include <gmni/tofu.h>
 #include <gmni/url.h>
@@ -382,13 +383,50 @@ do_requests(struct browser *browser, struct gemini_response *resp)
 	int nredir = 0;
 	bool requesting = true;
 	enum gemini_result res;
-	while (requesting) {
-		char *scheme;
+		
+	char *scheme;
+	CURLUcode uc = curl_url_get(browser->url,
+		CURLUPART_SCHEME, &scheme, 0);
+	assert(uc == CURLUE_OK); // Invariant
+
+	char *host = NULL;
+	struct gmni_client_certificate client_cert = {0};
+	const struct pathspec paths[] = {
+		{.var = "GMNIDATA", .path = "/certs/%s.%s"},
+		{.var = "XDG_DATA_HOME", .path = "/gmni/certs/%s.%s"},
+		{.var = "HOME", .path = "/.local/share/gmni/certs/%s.%s"}
+	};
+	char *path_fmt = getpath(paths, sizeof(paths) / sizeof(paths[0]));
+	char certpath[PATH_MAX+1], keypath[PATH_MAX+1];
+	size_t n = 0;
+
+	if (strcmp(scheme, "gemini") == 0) {
 		CURLUcode uc = curl_url_get(browser->url,
-			CURLUPART_SCHEME, &scheme, 0);
-		assert(uc == CURLUE_OK); // Invariant
+			CURLUPART_HOST, &host, 0);
+		assert(uc == CURLUE_OK);
+
+		n = snprintf(certpath, sizeof(certpath), path_fmt, host, "crt");
+		assert(n < sizeof(certpath));
+		FILE *certin = fopen(certpath, "r");
+		if (certin) {
+			n = snprintf(keypath, sizeof(keypath), path_fmt, host, "key");
+			assert(n < sizeof(keypath));
+
+			FILE *skin = fopen(keypath, "r");
+			if (gmni_ccert_load(&client_cert, certin, skin)) {
+				browser->opts.client_cert = NULL;
+				fprintf(stderr, "Unable to load client certificate for host %s", host);
+			} else {
+				browser->opts.client_cert = &client_cert;
+			}
+		} else {
+			browser->opts.client_cert = NULL;
+		}
+		free(host);
+	}
+
+	while (requesting) {
 		if (strcmp(scheme, "file") == 0) {
-			free(scheme);
 			requesting = false;
 
 			char *path;
@@ -423,9 +461,9 @@ do_requests(struct browser *browser, struct gemini_response *resp)
 			resp->status = GEMINI_STATUS_SUCCESS;
 			resp->fd = fd;
 			resp->sc = NULL;
-			return GEMINI_OK;
+			res = GEMINI_OK;
+			goto out;
 		}
-		free(scheme);
 
 		res = gemini_request(browser->plain_url, &browser->opts,
 				&browser->tofu, resp);
@@ -467,7 +505,19 @@ do_requests(struct browser *browser, struct gemini_response *resp)
 			set_url(browser, resp->meta, NULL);
 			break;
 		case GEMINI_STATUS_CLASS_CLIENT_CERTIFICATE_REQUIRED:
-			assert(0); // TODO
+			requesting = false;
+			assert(host);
+			n = snprintf(certpath, sizeof(certpath), path_fmt, host, "crt");
+			assert(n < sizeof(certpath));
+			n = snprintf(keypath, sizeof(keypath), path_fmt, host, "key");
+			assert(n < sizeof(keypath));
+			fprintf(stderr, "The server requested a client certificate.\n"
+				"Presently, this process is not automated.\n"
+				"The following OpenSSL command will generate a certificate for this host:\n\n"
+				"openssl req -x509 -newkey rsa:4096 \\\n\t-keyout %s \\\n\t-out %s \\\n\t-days 36500 -nodes\n\n"
+				"Use the 'r' command to reload the page after creating this certificate.\n",
+				keypath, certpath);
+			break;
 		case GEMINI_STATUS_CLASS_TEMPORARY_FAILURE:
 		case GEMINI_STATUS_CLASS_PERMANENT_FAILURE:
 			requesting = false;
@@ -477,7 +527,7 @@ do_requests(struct browser *browser, struct gemini_response *resp)
 				resp->status, resp->meta);
 			break;
 		case GEMINI_STATUS_CLASS_SUCCESS:
-			return res;
+			goto out;
 		}
 
 		if (requesting) {
@@ -485,6 +535,11 @@ do_requests(struct browser *browser, struct gemini_response *resp)
 		}
 	}
 
+out:
+	if (client_cert.key) {
+		free(client_cert.key);
+	}
+	free(scheme);
 	return res;
 }
 

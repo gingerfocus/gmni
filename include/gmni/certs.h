@@ -20,7 +20,7 @@ struct gmni_private_key {
 	unsigned char data[];
 };
 
-// Returns nonzero on failure and sets errno
+// Returns nonzero on failure and sets errno. Closes both files.
 int gmni_ccert_load(struct gmni_client_certificate *cert,
 		FILE *certin, FILE *skin);
 

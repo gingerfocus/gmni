@@ -15,6 +15,7 @@ gmni() {
 
 gmnlm() {
 	genrules gmnlm \
+		src/certs.c \
 		src/client.c \
 		src/escape.c \
 		src/gmnlm.c \
@@ -26,6 +27,7 @@ gmnlm() {
 
 libgmni_a() {
 	genrules libgmni.a \
+		src/certs.c \
 		src/client.c \
 		src/escape.c \
 		src/tofu.c \
