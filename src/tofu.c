@@ -62,9 +62,6 @@ xt_end_cert(const br_x509_class **ctx)
 		cc->err = err;
 		return;
 	}
-	if (br_x509_decoder_isCA(&cc->decoder)) {
-		return;
-	}
 	cc->pkey = br_x509_decoder_get_pkey(&cc->decoder);
 	br_sha512_out(&cc->sha512, &cc->hash);
 }
