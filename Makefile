@@ -61,7 +61,7 @@ install: all install_docs
 	mkdir -p $(LIBDIR)/pkgconfig
 	install -m755 gmni $(BINDIR)/gmni
 	install -m755 gmnlm $(BINDIR)/gmnlm
-	install -m755 libgmni.a $(LIBDIR)/libgmni.a
+	install -m644 libgmni.a $(LIBDIR)/libgmni.a
 	install -m644 include/gmni/gmni.h $(INCLUDEDIR)/gmni/gmni.h
 	install -m644 include/gmni/tofu.h $(INCLUDEDIR)/gmni/tofu.h
 	install -m644 include/gmni/url.h $(INCLUDEDIR)/gmni/url.h
