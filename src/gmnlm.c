@@ -510,6 +510,13 @@ do_requests(struct browser *browser, struct gemini_response *resp)
 			n = snprintf(certpath, sizeof(certpath), path_fmt, host, "crt");
 			assert(n < sizeof(certpath));
 			n = snprintf(keypath, sizeof(keypath), path_fmt, host, "key");
+			char dname[PATH_MAX + 1];
+			posix_dirname(certpath, dname);
+			if (mkdirs(dname, 0755) != 0) {
+				fprintf(stderr, "Error creating directory %s: %s\n",
+						dname, strerror(errno));
+				break;
+			}
 			assert(n < sizeof(keypath));
 			fprintf(stderr, "The server requested a client certificate.\n"
 				"Presently, this process is not automated.\n"

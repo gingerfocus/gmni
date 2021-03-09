@@ -11,7 +11,7 @@
 #include <sys/stat.h>
 #include "util.h"
 
-static void
+void
 posix_dirname(char *path, char *dname)
 {
 	char p[PATH_MAX+1];
