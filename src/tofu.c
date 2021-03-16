@@ -177,20 +177,15 @@ gemini_tofu_init(struct gemini_tofu *tofu, tofu_callback_t *cb, void *cb_data)
 	n = snprintf(tofu->known_hosts_path,
 		sizeof(tofu->known_hosts_path),
 		path_fmt, "known_hosts");
+	free(path_fmt);
 	assert(n < sizeof(tofu->known_hosts_path));
 
-	strncpy(dname, dirname(tofu->known_hosts_path), sizeof(dname)-1);
+	posix_dirname(tofu->known_hosts_path, dname);
 	if (mkdirs(dname, 0755) != 0) {
-		snprintf(tofu->known_hosts_path, sizeof(tofu->known_hosts_path),
-				path_fmt, "known_hosts");
-		fprintf(stderr, "Error creating directory %s: %s\n",
-				dirname(tofu->known_hosts_path), strerror(errno));
+		fprintf(stderr, "Error creating directory %s: %s\n", dname,
+			strerror(errno));
 		return;
 	}
-
-	snprintf(tofu->known_hosts_path, sizeof(tofu->known_hosts_path),
-			path_fmt, "known_hosts");
-	free(path_fmt);
 
 	tofu->callback = cb;
 	tofu->cb_data = cb_data;

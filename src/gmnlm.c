@@ -162,18 +162,15 @@ save_bookmark(struct browser *browser)
 	size_t n;
 
 	n = snprintf(path, sizeof(path), path_fmt, "bookmarks.gmi");
+	free(path_fmt);
 	assert(n < sizeof(path));
-	strncpy(dname, dirname(path), sizeof(dname)-1);
+	posix_dirname(path, dname);
 	if (mkdirs(dname, 0755) != 0) {
-		snprintf(path, sizeof(path), path_fmt, "bookmarks.gmi");
-		free(path_fmt);
 		fprintf(stderr, "Error creating directory %s: %s\n",
-				dirname(path), strerror(errno));
+				dname, strerror(errno));
 		return;
 	}
 
-	snprintf(path, sizeof(path), path_fmt, "bookmarks.gmi");
-	free(path_fmt);
 	FILE *f = fopen(path, "a");
 	if (!f) {
 		fprintf(stderr, "Error opening %s for writing: %s\n",
@@ -203,18 +200,14 @@ open_bookmarks(struct browser *browser)
 	size_t n;
 
 	n = snprintf(path, sizeof(path), path_fmt, "bookmarks.gmi");
+	free(path_fmt);
 	assert(n < sizeof(path));
-	strncpy(dname, dirname(path), sizeof(dname)-1);
+	posix_dirname(path, dname);
 	if (mkdirs(dname, 0755) != 0) {
-		snprintf(path, sizeof(path), path_fmt, "bookmarks.gmi");
-		free(path_fmt);
 		fprintf(stderr, "Error creating directory %s: %s\n",
-				dirname(path), strerror(errno));
+				dname, strerror(errno));
 		return;
 	}
-
-	snprintf(path, sizeof(path), path_fmt, "bookmarks.gmi");
-	free(path_fmt);
 
 	struct stat buf;
 	if (stat(path, &buf) == -1 && errno == ENOENT) {
