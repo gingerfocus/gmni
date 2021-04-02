@@ -978,6 +978,7 @@ repeat:
 			switch (result) {
 			case PROMPT_AGAIN:
 			case PROMPT_MORE:
+				printf("\n");
 				break;
 			case PROMPT_QUIT:
 				browser->running = false;
