@@ -845,6 +845,10 @@ display_gemini(struct browser *browser, struct gemini_response *resp)
 	int row = 0, col = 0;
 	struct gemini_token tok;
 	struct link **next = &browser->links;
+	// When your screen is too narrow, more lines will be used for helptext and URL.
+	// 87 is the maximum width of the prompt.
+	int info_rows = (ws.ws_col >= 87) ? 4 : 6;
+
 	while (text != NULL || gemini_parser_next(&p, &tok) == 0) {
 repeat:
 		switch (tok.token) {
@@ -933,7 +937,7 @@ repeat:
 		if (text) {
 			int w = wrap(out, text, &ws, &row, &col);
 			text += w;
-			if (text[0] && row < ws.ws_row - 4) {
+			if (text[0] && row < ws.ws_row - info_rows) {
 				continue;
 			}
 
@@ -951,7 +955,7 @@ repeat:
 		}
 		++row; col = 0;
 
-		if (browser->pagination && row >= ws.ws_row - 4) {
+		if (browser->pagination && row >= ws.ws_row - info_rows) {
 			char prompt[4096];
 			char *end = NULL;
 			if (browser->meta && (end = strchr(resp->meta, ';')) != NULL) {
