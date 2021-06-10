@@ -415,7 +415,6 @@ do_requests(struct browser *browser, struct gemini_response *resp)
 		} else {
 			browser->opts.client_cert = NULL;
 		}
-		free(host);
 	}
 
 	while (requesting) {
@@ -540,6 +539,7 @@ out:
 		free(client_cert.key);
 	}
 	free(scheme);
+	free(host);
 	return res;
 }
 
