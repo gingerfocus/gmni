@@ -290,6 +290,10 @@ main(int argc, char *argv[])
 			goto next;
 		}
 
+		if (header_mode != OMIT_HEADERS) {
+			printf("%d %s\n", resp.status, resp.meta);
+		}
+
 		switch (gemini_response_class(resp.status)) {
 		case GEMINI_STATUS_CLASS_INPUT:
 			if (input_mode == INPUT_SUPPRESS) {
@@ -351,14 +355,7 @@ main(int argc, char *argv[])
 			break;
 		}
 
-		switch (header_mode) {
-		case ONLY_HEADERS:
-			printf("%d %s\n", resp.status, resp.meta);
-			break;
-		case SHOW_HEADERS:
-			printf("%d %s\n", resp.status, resp.meta);
-			/* fallthrough */
-		case OMIT_HEADERS:
+		if (header_mode != ONLY_HEADERS) {
 			if (gemini_response_class(resp.status) !=
 					GEMINI_STATUS_CLASS_SUCCESS) {
 				break;
