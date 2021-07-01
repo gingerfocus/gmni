@@ -598,15 +598,19 @@ do_prompts(const char *prompt, struct browser *browser)
 	case 'H':
 		if (in[1]) break;
 		struct history *cur = browser->history;
-		while (cur->prev) cur = cur->prev;
+		int hist_count = 0;
+		while (cur->prev) {
+			cur = cur->prev;
+			hist_count++;
+		}
 		while (cur != browser->history) {
-			fprintf(browser->tty, "  %s\n", cur->url);
+			fprintf(browser->tty, "b%-3i %s\n", hist_count--, cur->url);
 			cur = cur->next;
 		}
-		fprintf(browser->tty, "* %s\n", cur->url);
+		fprintf(browser->tty, "*    %s\n", cur->url);
 		cur = cur->next;
 		while (cur) {
-			fprintf(browser->tty, "  %s\n", cur->url);
+			fprintf(browser->tty, "f%-3i %s\n", ++hist_count, cur->url);
 			cur = cur->next;
 		}
 		result = PROMPT_AGAIN;
