@@ -29,7 +29,7 @@ libgmni.pc:
 	@printf 'Name: libgmni\n' >> $@
 	@printf 'Version: %s\n' "$(VERSION)" >> $@
 	@printf 'Description: The gmni client library\n' >> $@
-	@printf 'Requires: libssl libcrypto\n' >> $@
+	@printf 'Requires: libbearssl\n' >> $@
 	@printf 'Cflags: -I$${includedir}/gmni\n' >> $@
 	@printf 'Libs: -L$${libdir} -lgmni\n' >> $@
 
