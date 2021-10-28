@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <unistd.h>
 #include "util.h"
 
 void
@@ -83,10 +84,13 @@ download_resp(FILE *out, struct gemini_response resp, const char *path,
 	fprintf(out, "Downloading %s to %s\n", url, path);
 	char buf[BUFSIZ];
 	for (int n = 1; n > 0;) {
-		n = br_sslio_read(&resp.body, buf, sizeof(buf));
-		if (n == -1) {
-			fprintf(stderr, "Error: read\n");
-			return 1;
+		if (resp.sc) {
+			n = br_sslio_read(&resp.body, buf, BUFSIZ);
+		} else {
+			n = read(resp.fd, buf, BUFSIZ);
+		}
+		if (n < 0) {
+			break;
 		}
 		ssize_t w = 0;
 		while (w < (ssize_t)n) {
