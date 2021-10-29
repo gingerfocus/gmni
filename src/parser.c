@@ -44,9 +44,7 @@ gemini_parser_next(struct gemini_parser *p, struct gemini_token *tok)
 		}
 
 		int n = p->read(p->state, &p->buf[p->bufln], p->bufsz - p->bufln - 1);
-		if (n == -1) {
-			return -1;
-		} else if (n == 0) {
+		if (n < 1) {
 			eof = p->bufln == 0;
 			break;
 		}
