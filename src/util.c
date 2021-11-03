@@ -82,9 +82,9 @@ download_resp(FILE *out, struct gemini_response resp, const char *path,
 		}
 		break;
 	default:
-		if (strlen(path_buf) > PATH_MAX) {
+		if (strlen(path) > PATH_MAX) {
 			fprintf(stderr, "Path %s exceeds limit of %d bytes\n",
-				path_buf, PATH_MAX);
+				path, PATH_MAX);
 			return 1;
 		}
 		strcpy(path_buf, path);
