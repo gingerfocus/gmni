@@ -66,22 +66,48 @@ download_resp(FILE *out, struct gemini_response resp, const char *path,
 		char *url)
 {
 	char path_buf[PATH_MAX];
+	int n = 0;
 	assert(path);
-	if (path[0] == '\0') {
-		path = "./";
+	switch (path[0]) {
+	case '\0':
+		strcpy(path_buf, "./");
+		break;
+	case '~':
+		n = snprintf(path_buf, PATH_MAX, "%s/%s", getenv("HOME"), &path[1]);
+		if (n > PATH_MAX) {
+			fprintf(stderr,
+				"Path %s exceeds limit of %d bytes and has been truncated\n",
+				path_buf, PATH_MAX);
+			return 1;
+		}
+		break;
+	default:
+		if (strlen(path_buf) > PATH_MAX) {
+			fprintf(stderr, "Path %s exceeds limit of %d bytes\n",
+				path_buf, PATH_MAX);
+			return 1;
+		}
+		strcpy(path_buf, path);
 	}
-	if (path[strlen(path)-1] == '/') {
-		int n = snprintf(path_buf, sizeof(path_buf), "%s%s", path, basename(url));
-		assert((size_t)n < sizeof(path_buf));
-		path = path_buf;
+	char path_res[PATH_MAX];
+	if (path_buf[strlen(path_buf)-1] == '/') {
+		n = snprintf(path_res, PATH_MAX, "%s%s", path_buf, basename(url));
+		if (n > PATH_MAX) {
+			fprintf(stderr, 
+				"Path %s exceeds limit of %d bytes and has been truncated\n",
+				path_res, PATH_MAX);
+			return 1;
+		}
+	} else {
+		strcpy(path_res, path_buf);
 	}
-	FILE *f = fopen(path, "w");
+	FILE *f = fopen(path_res, "w");
 	if (f == NULL) {
 		fprintf(stderr, "Could not open %s for writing: %s\n",
-			path, strerror(errno));
+			path_res, strerror(errno));
 		return 1;
 	}
-	fprintf(out, "Downloading %s to %s\n", url, path);
+	fprintf(out, "Downloading %s to %s\n", url, path_res);
 	char buf[BUFSIZ];
 	for (int n = 1; n > 0;) {
 		if (resp.sc) {
