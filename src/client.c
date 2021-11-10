@@ -187,6 +187,8 @@ gemini_request(const char *url, struct gemini_options *options,
 				br_ecdsa_sign_asn1_get_default());
 			break;
 		}
+	} else {
+		br_ssl_client_set_client_certificate(resp->sc, NULL);
 	}
 	br_ssl_client_reset(resp->sc, host, 0);
 
