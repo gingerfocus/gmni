@@ -95,7 +95,7 @@ const char *help_msg =
 static void
 usage(const char *argv_0)
 {
-	fprintf(stderr, "usage: %s [gemini://...]\n", argv_0);
+	fprintf(stderr, "usage: %s [-PU] [-j mode] [-W width] [gemini://...]\n", argv_0);
 }
 
 static void
