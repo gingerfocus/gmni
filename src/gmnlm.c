@@ -553,6 +553,7 @@ do_prompts(const char *prompt, struct browser *browser)
 	char *in = NULL;
 	ssize_t n = getline(&in, &l, browser->tty);
 	if (n == -1 && feof(browser->tty)) {
+		fputc('\n', browser->tty);
 		result = PROMPT_QUIT;
 		goto exit;
 	}
