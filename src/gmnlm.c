@@ -80,7 +80,7 @@ const char *help_msg =
 	"b[N]\tJump back N entries in history, N is optional, default 1\n"
 	"f[N]\tJump forward N entries in history, N is optional, default 1\n"
 	"H\tView all page history\n"
-	"m\tSave bookmark\n"
+	"m [title]\tSave bookmark\n"
 	"M\tBrowse bookmarks\n"
 	"r\tReload the page\n"
 	"d <path>\tDownload page to <path>\n"
@@ -154,7 +154,7 @@ trim_ws(char *in)
 }
 
 static void
-save_bookmark(struct browser *browser)
+save_bookmark(struct browser *browser, const char *title)
 {
 	char *path_fmt = get_data_pathfmt();
 	static char path[PATH_MAX+1];
@@ -176,11 +176,6 @@ save_bookmark(struct browser *browser)
 		fprintf(stderr, "Error opening %s for writing: %s\n",
 				path, strerror(errno));
 		return;
-	}
-
-	char *title = browser->page_title;
-	if (title) {
-		title = trim_ws(browser->page_title);
 	}
 
 	fprintf(f, "=> %s%s%s\n", browser->plain_url,
@@ -617,8 +612,9 @@ do_prompts(const char *prompt, struct browser *browser)
 		result = PROMPT_AGAIN;
 		goto exit;
 	case 'm':
-		if (in[1]) break;
-		save_bookmark(browser);
+		if (in[1] != '\0' && !isspace(in[1])) break;
+		char *title = in[1] ? &in[1] : browser->page_title;
+		save_bookmark(browser, trim_ws(title));
 		result = PROMPT_AGAIN;
 		goto exit;
 	case 'M':
