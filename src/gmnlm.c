@@ -614,7 +614,7 @@ do_prompts(const char *prompt, struct browser *browser)
 	case 'm':
 		if (in[1] != '\0' && !isspace(in[1])) break;
 		char *title = in[1] ? &in[1] : browser->page_title;
-		save_bookmark(browser, trim_ws(title));
+		save_bookmark(browser, title ? trim_ws(title) : title);
 		result = PROMPT_AGAIN;
 		goto exit;
 	case 'M':
