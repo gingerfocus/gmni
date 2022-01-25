@@ -83,7 +83,7 @@ const char *help_msg =
 	"m [title]\tSave bookmark\n"
 	"M\tBrowse bookmarks\n"
 	"r\tReload the page\n"
-	"d <path>\tDownload page to <path>\n"
+	"d [path]\tDownload page to path\n"
 	"|<prog>\tPipe page into program\n"
 	"\n"
 	"Other commands include:\n\n"
@@ -1056,7 +1056,7 @@ display_response(struct browser *browser, struct gemini_response *resp)
 	if (strncmp(resp->meta, "text/", 5) == 0) {
 		return display_plaintext(browser, resp);
 	}
-	fprintf(stderr, "Media type %s is unsupported, use \"d <path>\" to download this page\n",
+	fprintf(stderr, "Media type %s is unsupported, use \"d [path]\" to download this page\n",
 		resp->meta);
 	return false;
 }
