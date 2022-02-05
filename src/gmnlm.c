@@ -1012,7 +1012,6 @@ repeat:
 static bool
 display_plaintext(struct browser *browser, struct gemini_response *resp)
 {
-	// TODO: Strip ANSI escape sequences
 	struct winsize ws;
 	int row = 0, col = 0;
 	ioctl(fileno(browser->tty), TIOCGWINSZ, &ws);
@@ -1026,6 +1025,11 @@ display_plaintext(struct browser *browser, struct gemini_response *resp)
 		}
 		if (n < 0) {
 			n = 0;
+		}
+		for (int i = 0; i < n; i++) {
+			if (iscntrl(buf[i]) && (buf[i] < '\t' || buf[i] > '\v')) {
+				buf[i] = '.';
+			}
 		}
 		ssize_t w = 0;
 		while (w < (ssize_t)n) {
