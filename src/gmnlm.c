@@ -533,6 +533,7 @@ out:
 	if (client_cert.key) {
 		free(client_cert.key);
 	}
+	free(path_fmt);
 	free(scheme);
 	free(host);
 	return res;
