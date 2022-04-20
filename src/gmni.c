@@ -189,7 +189,7 @@ main(int argc, char *argv[])
 			break;
 		case 'd':
 			input_mode = INPUT_READ;
-			input_source = fmemopen(optarg, strlen(optarg), "r");
+			input_source = fmemopen(optarg, strlen(optarg) + 1, "r");
 			break;
 		case 'D':
 			input_mode = INPUT_READ;
