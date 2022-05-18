@@ -83,8 +83,8 @@ const char *help_msg =
 	"m [title]\tSave bookmark\n"
 	"M\tBrowse bookmarks\n"
 	"r\tReload the page\n"
-	"d [path]\tDownload page to path\n"
-	"|<prog>\tPipe page into program\n"
+	"d[N] [path]\tDownload page, or Nth link, to path\n"
+	"[N]|<prog>\tPipe page, or Nth link, into program\n"
 	"\n"
 	"Other commands include:\n\n"
 	"<Enter>\tread more lines\n"
@@ -679,22 +679,41 @@ do_prompts(const char *prompt, struct browser *browser)
 		result = PROMPT_AGAIN;
 		goto exit;
 	case 'd':
-		if (in[1] != '\0' && !isspace(in[1])) break;
+		endptr = &in[1];
+		char *d_url = browser->plain_url;
+		if (in[1] != '\0' && !isspace(in[1])) {
+			struct link *link = browser->links;
+			int linksel = (int)strtol(in+1, &endptr, 10);
+			while (linksel > 0 && link) {
+				link = link->next;
+				--linksel;
+			}
+
+			if (!link) {
+				fprintf(stderr, "Error: no such link.\n");
+				break;
+			} else {
+				d_url = link->url;
+			}
+		}
 		struct gemini_response resp;
-		char url[1024] = {0};
-		strncpy(&url[0], browser->plain_url, sizeof(url)-1);
+		char url[1024] = {0}, old_url[1024] = {0};
+		strncpy(&old_url[0], browser->plain_url, sizeof(url)-1);
+		strncpy(&url[0], d_url, sizeof(url)-1);
 		// XXX: may affect history, do we care?
+		set_url(browser, url, NULL);
 		enum gemini_result res = do_requests(browser, &resp);
 		if (res != GEMINI_OK) {
 			fprintf(stderr, "Error: %s\n",
 				gemini_strerr(res, &resp));
 			result = PROMPT_AGAIN;
+			set_url(browser, old_url, NULL);
 			goto exit;
 		}
-		set_url(browser, url, NULL);
-		download_resp(browser->tty, resp, trim_ws(&in[1]), url);
+		download_resp(browser->tty, resp, trim_ws(endptr), url);
 		gemini_response_finish(&resp);
 		result = PROMPT_AGAIN;
+		set_url(browser, old_url, NULL);
 		goto exit;
 	case '|':
 		strncpy(&url[0], browser->plain_url, sizeof(url)-1);
