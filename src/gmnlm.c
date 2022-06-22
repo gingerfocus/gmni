@@ -480,7 +480,9 @@ do_requests(struct browser *browser, struct gemini_response *resp)
 				browser->plain_url, input);
 			free(input);
 			assert(new_url);
-			set_url(browser, new_url, NULL);
+			set_url(browser, new_url,
+				resp->status == GEMINI_STATUS_SENSITIVE_INPUT ?
+				NULL : &browser->history);
 			free(new_url);
 			break;
 		case GEMINI_STATUS_CLASS_REDIRECT:
