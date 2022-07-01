@@ -569,8 +569,11 @@ do_prompts(const char *prompt, struct browser *browser)
 		result = PROMPT_QUIT;
 		goto exit;
 	case 'b':
-		if (in[1]) {
+		if (in[1] && isdigit(in[1])) {
 			historyhops =(int)strtol(in+1, &endptr, 10);
+			if (endptr[0]) break;
+		} else if (in[1]) {
+			break;
 		}
 		while (historyhops > 0) {
 			if (browser->history->prev) {
@@ -582,8 +585,11 @@ do_prompts(const char *prompt, struct browser *browser)
 		result = PROMPT_ANSWERED;
 		goto exit;
 	case 'f':
-		if (in[1]) {
+		if (in[1] && isdigit(in[1])) {
 			historyhops =(int)strtol(in+1, &endptr, 10);
+			if (endptr[0]) break;
+		} else if (in[1]) {
+			break;
 		}
 		while (historyhops > 0) {
 			if (browser->history->next) {
