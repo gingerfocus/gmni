@@ -6,7 +6,7 @@ gmnlm - Gemini line-mode browser
 
 # SYNPOSIS
 
-*gmnlm* [-PU] [-j _mode_] [-W _width_] _gemini://..._
+*gmnlm* [-PU] [-j _mode_] [-R _redirs_] [-W _width_] _gemini://..._
 
 # DESCRIPTION
 
