@@ -22,6 +22,9 @@ gmnlm - Gemini line-mode browser
 *-P*
 	Disable pagination.
 
+*-R* _redirs_
+	Sets the maximum number of redirects, negative argument disables limit.
+
 *-U*
 	Disable conservative use of Unicode symbols to render Gemini layout
 	features.

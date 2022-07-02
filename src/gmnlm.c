@@ -33,9 +33,13 @@ struct history {
 	struct history *prev, *next;
 };
 
+#define REDIRS_UNLIMITED -1
+#define REDIRS_ASK -2
+
 struct browser {
 	bool pagination, unicode;
 	int max_width;
+	int max_redirs;
 	struct gemini_options opts;
 	struct gemini_tofu tofu;
 	enum tofu_action tofu_mode;
@@ -92,7 +96,7 @@ const char *help_msg =
 static void
 usage(const char *argv_0)
 {
-	fprintf(stderr, "usage: %s [-PU] [-j mode] [-W width] [gemini://...]\n", argv_0);
+	fprintf(stderr, "usage: %s [-PU] [-j mode] [-R redirs] [-W width] [gemini://...]\n", argv_0);
 }
 
 static void
@@ -368,7 +372,7 @@ do_requests(struct browser *browser, struct gemini_response *resp)
 	int nredir = 0;
 	bool requesting = true;
 	enum gemini_result res;
-		
+
 	char *scheme;
 	CURLUcode uc = curl_url_get(browser->url,
 		CURLUPART_SCHEME, &scheme, 0);
@@ -483,9 +487,40 @@ do_requests(struct browser *browser, struct gemini_response *resp)
 			free(new_url);
 			break;
 		case GEMINI_STATUS_CLASS_REDIRECT:
-			if (++nredir >= 5) {
+			if (browser->max_redirs == REDIRS_ASK) {
+again:
+				fprintf(browser->tty,
+					"The host %s is redirecting to:\n"
+					"%s\n\n"
+					"[f]ollow redirect; [a]bort\n"
+					"=> ", host, resp->meta);
+
+				size_t sz = 0;
+				char *line = NULL;
+				if (getline(&line, &sz, browser->tty) == -1) {
+					free(line);
+					requesting = false;
+					break;
+				}
+				if (line[1] != '\n') {
+					free(line);
+					goto again;
+				}
+
+				char c = line[0];
+				free(line);
+
+				if (c == 'a') {
+					requesting = false;
+					break;
+				} else if (c != 'f') {
+					goto again;
+				}
+			} else if (browser->max_redirs != REDIRS_UNLIMITED
+					&& ++nredir >= browser->max_redirs) {
 				requesting = false;
-				fprintf(stderr, "Error: maximum redirects (5) exceeded\n");
+				fprintf(stderr, "Error: maximum redirects (%d) exceeded\n",
+					browser->max_redirs);
 				break;
 			}
 			set_url(browser, resp->meta, NULL);
@@ -1185,10 +1220,11 @@ main(int argc, char *argv[])
 		.url = curl_url(),
 		.tty = fopen("/dev/tty", "w+"),
 		.meta = NULL,
+		.max_redirs = REDIRS_ASK,
 	};
 
 	int c;
-	while ((c = getopt(argc, argv, "hj:PUW:")) != -1) {
+	while ((c = getopt(argc, argv, "hj:PR:UW:")) != -1) {
 		switch (c) {
 		case 'h':
 			usage(argv[0]);
@@ -1207,6 +1243,10 @@ main(int argc, char *argv[])
 			break;
 		case 'P':
 			browser.pagination = false;
+			break;
+		case 'R':;
+			int mr = strtol(optarg, NULL, 10);
+			browser.max_redirs = mr < 0 ? REDIRS_UNLIMITED : mr;
 			break;
 		case 'U':
 			browser.unicode = false;
