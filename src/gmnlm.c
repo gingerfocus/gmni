@@ -576,7 +576,7 @@ out:
 static enum prompt_result
 do_prompts(const char *prompt, struct browser *browser)
 {
-	enum prompt_result result;
+	enum prompt_result result = PROMPT_AGAIN;
 	fprintf(browser->tty, "%s", prompt);
 
 	size_t l = 0;
@@ -590,22 +590,40 @@ do_prompts(const char *prompt, struct browser *browser)
 	in[n - 1] = 0; // Remove LF
 	char *endptr;
 
+	CURLU *url = curl_url();
+	bool isurl = curl_url_set(url, CURLUPART_URL, in, 0) == CURLUE_OK;
+	curl_url_cleanup(url);
+	if (isurl) {
+		set_url(browser, in, &browser->history);
+		result = PROMPT_ANSWERED;
+		goto exit;
+	}
+
 	int historyhops = 1;
 	int r;
 	switch (in[0]) {
 	case '\0':
 		result = PROMPT_MORE;
 		goto exit;
+	case '.':
+		break;
 	case 'q':
-		if (in[1]) break;
+		if (in[1]) {
+			fprintf(stderr, "Error: unrecognized command.\n");
+			goto exit;
+		}
 		result = PROMPT_QUIT;
 		goto exit;
 	case 'b':
 		if (in[1] && isdigit(in[1])) {
 			historyhops =(int)strtol(in+1, &endptr, 10);
-			if (endptr[0]) break;
+			if (endptr[0]) {
+				fprintf(stderr, "Error: invalid argument.\n");
+				goto exit;
+			}
 		} else if (in[1]) {
-			break;
+			fprintf(stderr, "Error: invalid argument.\n");
+			goto exit;
 		}
 		while (historyhops > 0) {
 			if (browser->history->prev) {
@@ -619,9 +637,13 @@ do_prompts(const char *prompt, struct browser *browser)
 	case 'f':
 		if (in[1] && isdigit(in[1])) {
 			historyhops =(int)strtol(in+1, &endptr, 10);
-			if (endptr[0]) break;
+			if (endptr[0]) {
+				fprintf(stderr, "Error: invalid argument.\n");
+				goto exit;
+			}
 		} else if (in[1]) {
-			break;
+			fprintf(stderr, "Error: invalid argument.\n");
+			goto exit;
 		}
 		while (historyhops > 0) {
 			if (browser->history->next) {
@@ -633,7 +655,10 @@ do_prompts(const char *prompt, struct browser *browser)
 		result = PROMPT_ANSWERED;
 		goto exit;
 	case 'H':
-		if (in[1]) break;
+		if (in[1]) {
+			fprintf(stderr, "Error: unrecognized command.\n");
+			goto exit;
+		}
 		struct history *cur = browser->history;
 		int hist_count = 0;
 		while (cur->prev) {
@@ -650,16 +675,20 @@ do_prompts(const char *prompt, struct browser *browser)
 			fprintf(browser->tty, "f%-3i %s\n", ++hist_count, cur->url);
 			cur = cur->next;
 		}
-		result = PROMPT_AGAIN;
 		goto exit;
 	case 'm':
-		if (in[1] != '\0' && !isspace(in[1])) break;
+		if (in[1] != '\0' && !isspace(in[1])) {
+			fprintf(stderr, "Error: unrecognized command.\n");
+			goto exit;
+		}
 		char *title = in[1] ? &in[1] : browser->page_title;
 		save_bookmark(browser, title ? trim_ws(title) : title);
-		result = PROMPT_AGAIN;
 		goto exit;
 	case 'M':
-		if (in[1]) break;
+		if (in[1]) {
+			fprintf(stderr, "Error: unrecognized command.\n");
+			goto exit;
+		}
 		open_bookmarks(browser);
 		result = PROMPT_ANSWERED;
 		goto exit;
@@ -670,24 +699,31 @@ do_prompts(const char *prompt, struct browser *browser)
 			r = regerror(r, &browser->regex, buf, sizeof(buf));
 			assert(r < (int)sizeof(buf));
 			fprintf(stderr, "Error: %s\n", buf);
-			result = PROMPT_AGAIN;
 		} else {
 			browser->searching = true;
 			result = PROMPT_ANSWERED;
 		}
 		goto exit_re;
 	case 'n':
-		if (in[1]) break;
+		if (in[1]) {
+			fprintf(stderr, "Error: unrecognized command.\n");
+			goto exit;
+		}
 		if (browser->searching) {
 			result = PROMPT_NEXT;
 			goto exit_re;
 		} else {
 			fprintf(stderr, "Cannot move to next result; we are not searching for anything\n");
-			result = PROMPT_AGAIN;
 			goto exit;
 		}
 	case 'p':
-		if (!in[1]) break;
+		if (!in[1]) {
+			fprintf(stderr, "Error: missing argument.\n");
+			goto exit;
+		} else if (!isdigit(in[1])) {
+			fprintf(stderr, "Error: invalid argument.\n");
+			goto exit;
+		}
 		struct link *link = browser->links;
 		int linksel = (int)strtol(in+1, &endptr, 10);
 		if (!endptr[0] && linksel >= 0) {
@@ -700,23 +736,26 @@ do_prompts(const char *prompt, struct browser *browser)
 				fprintf(stderr, "Error: no such link.\n");
 			} else {
 				fprintf(browser->tty, "=> %s\n", link->url);
-				result = PROMPT_AGAIN;
 				goto exit;
 			}
 		} else {
 			fprintf(stderr, "Error: invalid argument.\n");
 		}
-		result = PROMPT_AGAIN;
 		goto exit;
 	case 'r':
-		if (in[1]) break;
+		if (in[1]) {
+			fprintf(stderr, "Error: unrecognized command.\n");
+			goto exit;
+		}
 		result = PROMPT_ANSWERED;
 		goto exit;
 	case 'i':
-		if (in[1]) break;
+		if (in[1]) {
+			fprintf(stderr, "Error: unrecognized command.\n");
+			goto exit;
+		}
 		print_media_parameters(browser->tty, browser->meta
 				? strchr(browser->meta, ';') : NULL);
-		result = PROMPT_AGAIN;
 		goto exit;
 	case 'd':
 		endptr = &in[1];
@@ -731,7 +770,7 @@ do_prompts(const char *prompt, struct browser *browser)
 
 			if (!link) {
 				fprintf(stderr, "Error: no such link.\n");
-				break;
+				goto exit;
 			} else {
 				d_url = link->url;
 			}
@@ -746,13 +785,11 @@ do_prompts(const char *prompt, struct browser *browser)
 		if (res != GEMINI_OK) {
 			fprintf(stderr, "Error: %s\n",
 				gemini_strerr(res, &resp));
-			result = PROMPT_AGAIN;
 			set_url(browser, old_url, NULL);
 			goto exit;
 		}
 		download_resp(browser->tty, resp, trim_ws(endptr), url);
 		gemini_response_finish(&resp);
-		result = PROMPT_AGAIN;
 		set_url(browser, old_url, NULL);
 		goto exit;
 	case '|':
@@ -761,24 +798,33 @@ do_prompts(const char *prompt, struct browser *browser)
 		if (res != GEMINI_OK) {
 			fprintf(stderr, "Error: %s\n",
 				gemini_strerr(res, &resp));
-			result = PROMPT_AGAIN;
 			goto exit;
 		}
 		pipe_resp(browser->tty, resp, &in[1]);
 		gemini_response_finish(&resp);
 		set_url(browser, url, NULL);
-		result = PROMPT_AGAIN;
 		goto exit;
 	case '?':
-		if (in[1]) break;
+		if (in[1]) {
+			fprintf(stderr, "Error: unrecognized command.\n");
+			goto exit;
+		}
 		fprintf(browser->tty, "%s", help_msg);
-		result = PROMPT_AGAIN;
+		goto exit;
+	default:
+		if (isdigit(in[0])) break;
+		fprintf(stderr, "Error: unrecognized command.\n");
 		goto exit;
 	}
 
-	struct link *link = browser->links;
-	int linksel = (int)strtol(in, &endptr, 10);
-	if ((endptr[0] == '\0' || endptr[0] == '|') && linksel >= 0) {
+	if (isdigit(in[0])) {
+		struct link *link = browser->links;
+		int linksel = (int)strtol(in, &endptr, 10);
+		if ((endptr[0] && endptr[0] != '|') || linksel < 0) {
+			fprintf(stderr, "Error: no such link.\n");
+			goto exit;
+		}
+
 		while (linksel > 0 && link) {
 			link = link->next;
 			--linksel;
@@ -786,6 +832,7 @@ do_prompts(const char *prompt, struct browser *browser)
 
 		if (!link) {
 			fprintf(stderr, "Error: no such link.\n");
+			goto exit;
 		} else if (endptr[0] == '|') {
 			char url[1024] = {0};
 			struct gemini_response resp;
@@ -796,13 +843,11 @@ do_prompts(const char *prompt, struct browser *browser)
 				fprintf(stderr, "Error: %s\n",
 					gemini_strerr(res, &resp));
 				set_url(browser, url, NULL);
-				result = PROMPT_AGAIN;
 				goto exit;
 			}
 			pipe_resp(browser->tty, resp, &endptr[1]);
 			gemini_response_finish(&resp);
 			set_url(browser, url, NULL);
-			result = PROMPT_AGAIN;
 			goto exit;
 		} else {
 			assert(endptr[0] == '\0');
