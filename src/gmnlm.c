@@ -1185,9 +1185,11 @@ tofu_callback(enum tofu_error error, const char *fingerprint,
 		assert(0); // Invariant
 	case TOFU_INVALID_CERT:
 		snprintf(prompt, sizeof(prompt),
-			"The server presented an invalid certificate. If you choose to proceed, "
-			"you should not disclose personal information or trust the contents of the page.\n"
-			"trust [o]nce; [a]bort\n"
+			"The certificate offered by this server IS INVALID.\n"
+			"/!\\ Someone may be eavesdropping on or manipulating this connection. /!\\\n"
+			"If you choose to proceed, you should not disclose personal information or trust "
+			"the contents of the page.\n"
+			"[a]bort; trust [o]nce\n"
 			"=> ");
 		break;
 	case TOFU_UNTRUSTED_CERT:;
@@ -1208,17 +1210,18 @@ tofu_callback(enum tofu_error error, const char *fingerprint,
 		free(host);
 		break;
 	case TOFU_FINGERPRINT_MISMATCH:
-		fprintf(browser->tty,
+		snprintf(prompt, sizeof(prompt),
 			"The certificate offered by this server DOES NOT MATCH the one we have on file.\n"
 			"/!\\ Someone may be eavesdropping on or manipulating this connection. /!\\\n"
 			"The unknown certificate's fingerprint is:\n"
 			"%s\n\n"
 			"The expected fingerprint is:\n"
 			"%s\n\n"
-			"If you're certain that this is correct, edit %s:%d\n",
-			fingerprint, khost->fingerprint,
-			browser->tofu.known_hosts_path, khost->lineno);
-		return TOFU_FAIL;
+			"If you choose to proceed, you should not disclose personal information or trust "
+			"the contents of the page.\n"
+			"[a]bort; trust [o]nce; [t]rust anyway\n"
+			"=> ", fingerprint, khost->fingerprint);
+		break;
 	}
 
 	bool prompting = true;
