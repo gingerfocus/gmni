@@ -1,5 +1,7 @@
 # gmni - A Gemini client
 
+**Notice**: This project is no longer maintained.
+
 This is a [Gemini](https://gemini.circumlunar.space/) client. Included are:
 
 - A CLI utility (like curl): gmni
