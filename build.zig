@@ -8,7 +8,6 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
-
     gmni.addCSourceFiles(.{
         .files = &[_][]const u8{ 
             "src/certs.c",
@@ -23,10 +22,10 @@ pub fn build(b: *std.Build) void {
             "-g",
             "-std=c11",
             "-D_XOPEN_SOURCE=700",
-            // "-Wall",
-            // "-Wextra",
-            // "-Werror",
-            // "-pedantic",
+            "-Wall",
+            "-Wextra",
+            "-Werror",
+            "-pedantic",
             "-Iinclude",
         },
     });
@@ -40,9 +39,8 @@ pub fn build(b: *std.Build) void {
 
     b.installArtifact(exe);
 
-    const run_cmd = b.addRunArtifact(exe);
-    // run_cmd.step.dependOn(b.getInstallStep());
-    if (b.args) |args| run_cmd.addArgs(args);
-    const run_step = b.step("run", "Run the app");
-    run_step.dependOn(&run_cmd.step);
+    const run = b.addRunArtifact(exe);
+    if (b.args) |args| run.addArgs(args);
+    const step = b.step("run", "Run the app");
+    step.dependOn(&run.step);
 }

@@ -2,6 +2,7 @@
 build
 /gmni
 /.zig-cache
+/zig-out
 gmnlm
 *.1
 *.o

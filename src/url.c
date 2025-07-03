@@ -56,7 +56,6 @@ char *Curl_dedotdotify(const char *input)
 {
   size_t inlen = strlen(input);
   char *clone;
-  size_t clen = inlen; /* the length of the cloned input */
   char *out = malloc(inlen + 1);
   char *outptr;
   char *orgclone;
@@ -97,11 +96,9 @@ char *Curl_dedotdotify(const char *input)
 
     if(!strncmp("./", clone, 2)) {
       clone += 2;
-      clen -= 2;
     }
     else if(!strncmp("../", clone, 3)) {
       clone += 3;
-      clen -= 3;
     }
 
     /*  B.  if the input buffer begins with a prefix of "/./" or "/.", where
@@ -109,12 +106,10 @@ char *Curl_dedotdotify(const char *input)
         the input buffer; otherwise, */
     else if(!strncmp("/./", clone, 3)) {
       clone += 2;
-      clen -= 2;
     }
     else if(!strcmp("/.", clone)) {
       clone[1]='/';
       clone++;
-      clen -= 1;
     }
 
     /*  C.  if the input buffer begins with a prefix of "/../" or "/..", where
@@ -124,7 +119,6 @@ char *Curl_dedotdotify(const char *input)
 
     else if(!strncmp("/../", clone, 4)) {
       clone += 3;
-      clen -= 3;
       /* remove the last segment from the output buffer */
       while(outptr > out) {
         outptr--;
@@ -136,7 +130,6 @@ char *Curl_dedotdotify(const char *input)
     else if(!strcmp("/..", clone)) {
       clone[2]='/';
       clone += 2;
-      clen -= 2;
       /* remove the last segment from the output buffer */
       while(outptr > out) {
         outptr--;
@@ -162,7 +155,6 @@ char *Curl_dedotdotify(const char *input)
 
       do {
         *outptr++ = *clone++;
-        clen--;
       } while(*clone && (*clone != '/'));
       *outptr = 0;
     }
