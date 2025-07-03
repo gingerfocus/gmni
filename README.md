@@ -1,4 +1,5 @@
 # gmni - A Gemini client
+forked from: https://git.sr.ht/~sircmpwn/gmni
 
 **Notice**: This project is complete.
 

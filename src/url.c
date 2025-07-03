@@ -1023,7 +1023,7 @@ static CURLUcode parseurl(const char *url, struct Curl_URL *u, unsigned int flag
  */
 struct Curl_URL *curl_url(void)
 {
-  return calloc(sizeof(struct Curl_URL), 1);
+  return calloc(1, sizeof(struct Curl_URL));
 }
 
 void curl_url_cleanup(struct Curl_URL *u)
@@ -1043,7 +1043,7 @@ void curl_url_cleanup(struct Curl_URL *u)
 
 struct Curl_URL *curl_url_dup(struct Curl_URL *in)
 {
-  struct Curl_URL *u = calloc(sizeof(struct Curl_URL), 1);
+  struct Curl_URL *u = calloc(1, sizeof(struct Curl_URL));
   if(u) {
     DUP(u, in, scheme);
     DUP(u, in, user);

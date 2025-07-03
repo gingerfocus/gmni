@@ -1,6 +1,7 @@
 .build
 build
 /gmni
+/.zig-cache
 gmnlm
 *.1
 *.o

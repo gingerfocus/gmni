@@ -77,7 +77,8 @@ xt_end_chain(const br_x509_class **ctx)
 		return BR_ERR_X509_EMPTY_CHAIN;
 	}
 
-	char fingerprint[512 / 8 * 3];
+	// char fingerprint[512 / 8 * 3];
+	char fingerprint[512 / 8 * 4];
 	for (size_t i = 0; i < sizeof(cc->hash); ++i) {
 		snprintf(&fingerprint[i * 3], 4, "%02X%s",
 			cc->hash[i], i + 1 == sizeof(cc->hash) ? "" : ":");
