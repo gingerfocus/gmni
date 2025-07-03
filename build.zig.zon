@@ -1,15 +1,16 @@
 .{
     .name = .gmni,
     .version = "0.0.0",
-    .fingerprint = 0x8aad700db11e027, // Changing this has security and trust implications.
+    .fingerprint = 0x8aad700db11e027,
     .minimum_zig_version = "0.14.0",
     .dependencies = .{},
     .paths = .{
         "build.zig",
         "build.zig.zon",
         "src",
-        // For example...
-        //"LICENSE",
-        //"README.md",
+        "doc",
+        "include",
+        "COPYING",
+        "README.md",
     },
 }

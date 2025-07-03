@@ -1,36 +1,22 @@
-# gmni - A Gemini client
 forked from: https://git.sr.ht/~sircmpwn/gmni
 
-**Notice**: This project is complete.
+# gmni
+This is a [Gemini](https://gemini.circumlunar.space/) client.
 
-This is a [Gemini](https://gemini.circumlunar.space/) client. Included are:
-
-- A CLI utility (like curl): gmni
-- A [line-mode browser](https://en.wikipedia.org/wiki/Line_Mode_Browser): gmnlm
+Included is curl like utility: gmni
 
 Dependencies:
-
 - A POSIX-like system and a C11 compiler
 - [BearSSL](https://www.bearssl.org/index.html)
+- [zig](https://ziglang.org/)
 - [scdoc](https://sr.ht/~sircmpwn/scdoc/) (optional)
 
-Features:
-
-- Page history
-- Regex searches
-- Bookmarks
-
-[![Screenshot of the line-mode browser](https://l.sr.ht/7kaA.png)](https://asciinema.org/a/Y7viodM01e0AXYyf40CwSLAVA)
-
 ## Compiling
-
-```
-$ mkdir build && cd build
-$ ../configure
-$ make
-# make install
+```bash
+$ zig build
+$ zig build docs
 ```
 
 ## Usage
 
-See `gmni(1)`, `gmnlm(1)`.
+See `gmni(1)`.

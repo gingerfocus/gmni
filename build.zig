@@ -43,4 +43,14 @@ pub fn build(b: *std.Build) void {
     if (b.args) |args| run.addArgs(args);
     const step = b.step("run", "Run the app");
     step.dependOn(&run.step);
+
+    // ------------------ 
+
+    const scdoc = b.addSystemCommand(&.{"scdoc"});
+    scdoc.setStdIn(.{ .lazy_path = b.path("doc/gmni.scd") });
+    const docfile = scdoc.captureStdOut();
+    const docintall = b.addInstallFile(docfile, "share/man/gmni.1");
+
+    const docs = b.step("docs", "Generate documentation");
+    docs.dependOn(&docintall.step);
 }
